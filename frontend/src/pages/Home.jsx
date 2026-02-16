@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import heroImg from '@/assets/KrishTech Home.png';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Cpu, HardDrive, Shield, Zap } from 'lucide-react';
@@ -31,13 +32,13 @@ export function Home() {
                 </Link>
               </div>
             </div>
-            <div className="relative w-full h-[340px] sm:h-[420px] md:h-[500px] lg:h-[620px] xl:h-[720px] overflow-hidden rounded-xl shadow-2xl lg:self-start lg:justify-self-end">
+              <div className="relative w-full h-[340px] sm:h-[420px] md:h-[500px] lg:h-[620px] xl:h-[720px] overflow-hidden rounded-xl shadow-2xl lg:self-start lg:justify-self-end">
               <img
-                src="/assets/KrishTech%20Home.png"
+                src={heroImg}
                 alt="KrishTech Office"
                 className="absolute inset-0 w-full h-full object-cover object-[right_top]"
                 onError={(e) => {
-                  e.currentTarget.src = '/assets/logo.svg';
+                  e.currentTarget.src = '/assets/logo.png';
                 }}
               />
             </div>
@@ -126,7 +127,7 @@ export function Home() {
             <Card className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video relative overflow-hidden">
                 <img 
-                  src="/assets/KrishTech%20Home.png" 
+                  src="/assets/Software Solutions.jpg" 
                   alt="Software Solutions" 
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />
@@ -149,7 +150,7 @@ export function Home() {
             <Card className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video relative overflow-hidden">
                 <img 
-                  src="/assets/KrishTech%20Home.png" 
+                  src="/assets/hardware.jpg" 
                   alt="Hardware Services" 
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />

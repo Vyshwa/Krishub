@@ -3,9 +3,9 @@ import { Link } from '@tanstack/react-router';
 
 const apps = [
   { name: 'Reside', href: '/apps', color: 'bg-blue-500' },
-  { name: 'Reveal', href: '/apps', color: 'bg-violet-500' },
-  { name: 'Renote', href: '/apps', color: 'bg-emerald-500' },
-  { name: 'ReGen', href: '/apps', iconUrl: '/assets/logo.svg' },
+  { name: 'Reveal', href: '/apps', color: '/assets/Reveal.jpeg' },
+  { name: 'Renote', href: '/apps', color: '/renote.png' },
+  { name: 'ReGen', href: '/apps', iconUrl: '/assets/regen.png' },
   { name: 'Request', href: '/apps', color: 'bg-orange-500' },
   { name: 'Realm', href: '/apps', color: 'bg-indigo-500' },
   { name: 'Reserve', href: '/apps', color: 'bg-rose-500' }
