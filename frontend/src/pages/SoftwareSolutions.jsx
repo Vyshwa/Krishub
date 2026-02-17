@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import revealImg from '@/assets/Reveal.jpeg';
 import renoteImg from '@/assets/renote.png';
+import resideImg from '@/assets/Reside logo.jpg';
 import regenImg from '@/assets/regen.jpeg';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -91,6 +92,67 @@ export function SoftwareSolutions() {
                     <div className="pt-4">
                       <p className="text-sm text-muted-foreground italic">
                         Perfect for logistics companies, warehouses, and businesses managing complex supply chains.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="overflow-hidden border-2 hover:border-primary transition-colors">
+              <div className="grid lg:grid-cols-2 gap-0">
+                <div className="relative aspect-video lg:aspect-auto order-2 lg:order-1">
+                  <img
+                    src={resideImg}
+                    alt="Reside Housing Platform"
+                    className="object-cover object-center w-full h-full"
+                  />
+                </div>
+                <div className="p-8 lg:p-12 flex flex-col justify-center order-1 lg:order-2">
+                  <div className="space-y-6">
+                    <div>
+                      <Badge className="mb-4">Housing Platform</Badge>
+                      <h2 className="text-3xl font-bold tracking-tight mb-4">Reside</h2>
+                      <p className="text-lg text-muted-foreground mb-6">
+                        A modern housing platform that connects owners and tenants with clear interfaces,
+                        automated rent calculations, and accurate payment records.
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4">
+                      <h3 className="text-xl font-semibold">Key Features</h3>
+                      <div className="grid gap-4">
+                        <div className="flex gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold mb-1">Owner & Tenant Link</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Interfaces for owners and tenants to view units, leases, dues, and updates.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold mb-1">Auto Payments & Records</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Automatic rent calculations with on-time tracking and auditable payment history.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <p className="text-sm text-muted-foreground italic">
+                        Ideal for apartment owners, rental agencies, and housing communities.
                       </p>
                     </div>
                   </div>

@@ -1,6 +1,4 @@
 node_modules/
-**/node_modules/
-frontend/node_modules/
 .vscode/
 .DS_Store
 *.log
@@ -20,3 +18,4 @@ out/
 .cache/
 *.pem
 .git/
+frontend/public/assets/*.exe

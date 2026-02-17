@@ -4,6 +4,25 @@
         <link rel='icon' type='image/png' href='/src/assets/Top Down.png' />
         <meta name='viewport' content='width=device-width, initial-scale=1.0' />
         <title>KrishTech Computers - Business Website</title>
+        <script>
+          (function(){
+            if (location.hostname !== 'localhost') return;
+            var orig = console.error;
+            console.error = function(){
+              var args = Array.prototype.slice.call(arguments);
+              var blob = '';
+              try {
+                blob = args.map(function(a){ return a && a.message ? a.message : String(a); }).join(' ');
+              } catch(e) {}
+              if (blob.indexOf('net::ERR_NETWORK_IO_SUSPENDED') !== -1 ||
+                  blob.indexOf('net::ERR_ABORTED') !== -1 ||
+                  blob.indexOf('/@vite/client') !== -1) {
+                return;
+              }
+              orig.apply(console, args);
+            };
+          })();
+        </script>
     </head>
     <body>
         <div id='root'></div>

@@ -3,7 +3,7 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCurrentUser, useLogout } from '@/hooks/useAuth';
 import { AppLauncher } from '@/components/AppLauncher';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
@@ -60,6 +60,9 @@ export function Header() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navigation Menu</SheetTitle>
+            </SheetHeader>
             <nav className="flex flex-col space-y-4 mt-8">
               {navLinks.map((link) => (
                 <Link key={link.path} to={link.path} onClick={() => setIsOpen(false)}>

@@ -3,9 +3,10 @@ import { Link } from '@tanstack/react-router';
 import revealImg from '@/assets/Reveal.jpeg';
 import renoteImg from '@/assets/renote.png';
 import regenImg from '@/assets/regen.jpeg';
+import resideLogo from '@/assets/Reside logo.jpg';
 
 const apps = [
-  { name: 'Reside', href: '/apps', color: 'bg-blue-500' },
+  { name: 'Reside', href: '/apps', iconUrl: resideLogo },
   { name: 'Reveal', href: '/apps', iconUrl: revealImg },
   { name: 'Renote', href: '/apps', iconUrl: renoteImg },
   { name: 'ReGen', href: '/apps', iconUrl: regenImg },

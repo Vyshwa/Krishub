@@ -13,7 +13,8 @@ export function useCurrentUser() {
           credentials: 'include',
         });
         if (!res.ok) return null;
-        return await res.json();
+        const data = await res.json().catch(() => null);
+        return (data && data.user) || null;
       } catch {
         return null;
       }
@@ -37,7 +38,7 @@ export function useLogin() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data && (data.error || data.message)) || 'Invalid credentials');
-      return data;
+      return data && data.user ? data.user : data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['currentUser'] });
