@@ -1,5 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import heroImg from '@/assets/KrishTech Home.png';
+import softwareImg from '@/assets/Software Solutions.png';
+import hardwareImg from '@/assets/hardware.jpg';
+import logoImg from '@/assets/Top Down.png';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Cpu, HardDrive, Shield, Zap } from 'lucide-react';
@@ -38,7 +41,7 @@ export function Home() {
                 alt="KrishTech Office"
                 className="absolute inset-0 w-full h-full object-cover object-[right_top]"
                 onError={(e) => {
-                  e.currentTarget.src = '/assets/logo.png';
+                  e.currentTarget.src = logoImg;
                 }}
               />
             </div>
@@ -126,9 +129,9 @@ export function Home() {
           <div className="grid gap-8 md:grid-cols-2">
             <Card className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video relative overflow-hidden">
-                <img 
-                  src="/assets/Software Solutions.jpg" 
-                  alt="Software Solutions" 
+                <img
+                  src={softwareImg}
+                  alt="Software Solutions"
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -149,9 +152,9 @@ export function Home() {
             </Card>
             <Card className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video relative overflow-hidden">
-                <img 
-                  src="/assets/hardware.jpg" 
-                  alt="Hardware Services" 
+                <img
+                  src={hardwareImg}
+                  alt="Hardware Services"
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />
               </div>

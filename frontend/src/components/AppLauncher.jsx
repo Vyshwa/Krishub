@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
+import revealImg from '@/assets/Reveal.jpeg';
+import renoteImg from '@/assets/renote.png';
+import regenImg from '@/assets/regen.jpeg';
 
 const apps = [
   { name: 'Reside', href: '/apps', color: 'bg-blue-500' },
-  { name: 'Reveal', href: '/apps', color: '/assets/Reveal.jpeg' },
-  { name: 'Renote', href: '/apps', color: '/renote.png' },
-  { name: 'ReGen', href: '/apps', iconUrl: '/assets/regen.png' },
+  { name: 'Reveal', href: '/apps', iconUrl: revealImg },
+  { name: 'Renote', href: '/apps', iconUrl: renoteImg },
+  { name: 'ReGen', href: '/apps', iconUrl: regenImg },
   { name: 'Request', href: '/apps', color: 'bg-orange-500' },
   { name: 'Realm', href: '/apps', color: 'bg-indigo-500' },
   { name: 'Reserve', href: '/apps', color: 'bg-rose-500' }

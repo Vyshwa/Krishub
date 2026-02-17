@@ -6,6 +6,7 @@ import { Logo } from '@/components/Logo';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useCurrentUser, useLogout } from '@/hooks/useAuth';
 import { AppLauncher } from '@/components/AppLauncher';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,9 +26,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2">
-          <Logo size="md" />
-        </Link>
+        <div className="flex items-center gap-3">
+          <ThemeSwitcher />
+          <Link to="/" className="flex items-center space-x-2">
+            <Logo size="md" />
+          </Link>
+        </div>
 
         <nav className="hidden md:flex items-center space-x-1">
           {navLinks.map((link) => (
@@ -44,7 +48,9 @@ export function Header() {
         </div>
 
         <div className="md:hidden flex items-center gap-2">
+          <ThemeSwitcher />
           <AppLauncher />
+          <MobileLoginButton />
         </div>
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
@@ -94,5 +100,15 @@ function AuthActions() {
         <Button>Register</Button>
       </Link>
     </div>
+  );
+}
+
+function MobileLoginButton() {
+  const { data: user } = useCurrentUser();
+  if (user) return null;
+  return (
+    <Link to="/login">
+      <Button size="sm" variant="outline">Login</Button>
+    </Link>
   );
 }

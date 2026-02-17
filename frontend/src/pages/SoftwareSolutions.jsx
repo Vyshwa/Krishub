@@ -1,4 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import revealImg from '@/assets/Reveal.jpeg';
+import renoteImg from '@/assets/renote.png';
+import regenImg from '@/assets/regen.jpeg';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Package, BarChart3, FileText, Scan, TrendingUp, Users } from 'lucide-react';
@@ -26,7 +29,7 @@ export function SoftwareSolutions() {
               <div className="grid lg:grid-cols-2 gap-0">
                 <div className="relative aspect-video lg:aspect-auto">
                   <img
-                    src="/assets/Reveal.jpeg"
+                    src={revealImg}
                     alt="Reveal RFID Software"
                     className="object-cover w-full h-full"
                   />
@@ -97,9 +100,81 @@ export function SoftwareSolutions() {
 
             <Card className="overflow-hidden border-2 hover:border-primary transition-colors">
               <div className="grid lg:grid-cols-2 gap-0">
+                <div className="relative aspect-video lg:aspect-auto">
+                  <img
+                    src={regenImg}
+                    alt="ReGen Task & Scrum"
+                    className="object-cover w-full h-full"
+                  />
+                </div>
+                <div className="p-8 lg:p-12 flex flex-col justify-center">
+                  <div className="space-y-6">
+                    <div>
+                      <Badge className="mb-4">Team Management</Badge>
+                      <h2 className="text-3xl font-bold tracking-tight mb-4">ReGen</h2>
+                      <p className="text-lg text-muted-foreground mb-6">
+                        Owner and admin staff oriented application for managing tasks, schedules, and scrum ceremonies to keep teams aligned and productive.
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4">
+                      <h3 className="text-xl font-semibold">Key Features</h3>
+                      <div className="grid gap-4">
+                        <div className="flex gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold mb-1">Owner & Admin Focus</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Roles and permissions tailored for owners and administrative staff to manage access and oversight.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold mb-1">Task & Scrum Maintenance</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Create schedules, manage sprints and scrums, and keep track of progress with structured workflows.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold mb-1">Reporting & Insights</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Analytics and reporting to help owners track team performance and sprint outcomes.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <p className="text-sm text-muted-foreground italic">
+                        Built for teams that need clear scheduling, transparent scrums, and actionable task management.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="overflow-hidden border-2 hover:border-primary transition-colors">
+              <div className="grid lg:grid-cols-2 gap-0">
                 <div className="relative aspect-video lg:aspect-auto order-2 lg:order-1">
                   <img
-                    src="/assets/renote.png"
+                    src={renoteImg}
                     alt="Renote Business Management"
                     className="object-cover object-center w-full h-full"
                   />
