@@ -29,10 +29,10 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center space-x-2">
-            <Logo size="sm" />
-            <span className="text-xl font-bold tracking-tight text-primary">KrishTech</span>
+        <div className="flex items-center">
+          <Link to="/" className="flex items-end h-12">
+            <Logo size="md" />
+            <span className="text-2xl font-bold tracking-tight text-primary leading-none -ml-3 mb-2">Krishub</span>
           </Link>
         </div>
 
@@ -83,8 +83,8 @@ export function Header() {
                   </Button>
                 </Link>
                 {user && (
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="w-full justify-start gap-3 h-11 px-4 text-destructive hover:bg-destructive/10"
                     onClick={() => {
                       setIsOpen(false);
@@ -111,8 +111,8 @@ function AuthActions() {
   if (user) {
     return (
       <div className="flex items-center gap-4">
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer hidden lg:inline-block"
         >
           {user.name}

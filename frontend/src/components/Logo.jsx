@@ -1,8 +1,8 @@
-import logoPngUrl from '@/assets/Top Down.png';
+import logoPngUrl from '@/assets/LogoMark.png';
 
 const sizeClass = {
   sm: 'h-8',
-  md: 'h-12',
+  md: 'h-16',
   lg: 'h-20',
 };
 

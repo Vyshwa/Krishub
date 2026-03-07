@@ -26,7 +26,7 @@ export function Apps() {
         {/* Animated Background Orbs */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -mr-64 -mt-64 animate-pulse" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[100px] -ml-64 -mb-64 animate-pulse" />
-        
+
         <div className="container relative z-10">
           <div className="max-w-2xl mx-auto text-center space-y-8 p-12 bg-background/40 backdrop-blur-xl border-2 border-dashed rounded-[3rem] shadow-2xl">
             <div className="h-20 w-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner">
@@ -51,9 +51,9 @@ export function Apps() {
               </Link>
             </div>
             <div className="pt-8 border-t">
-               <Link to="/" className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-2 font-medium">
-                 <Home size={18} /> Back to KrishTech Home
-               </Link>
+              <Link to="/" className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-2 font-medium">
+                <Home size={18} /> Back to KrishTech Home
+              </Link>
             </div>
           </div>
         </div>
@@ -70,8 +70,8 @@ export function Apps() {
     { name: 'Realm', desc: 'Virtual Environment', icon: '🌐', color: 'bg-indigo-100 text-indigo-700', url: '/', isComingSoon: true }
   ];
 
-  const filteredApps = appList.filter(app => 
-    app.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredApps = appList.filter(app =>
+    app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     app.desc.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -86,24 +86,24 @@ export function Apps() {
             </div>
             <span className="font-bold text-xl tracking-tight">Console</span>
           </div>
-          
+
           <nav className="space-y-1">
-            <Button 
-              variant={activeSection === 'dashboard' ? 'secondary' : 'ghost'} 
+            <Button
+              variant={activeSection === 'dashboard' ? 'secondary' : 'ghost'}
               className="w-full justify-start gap-3 h-11 px-4"
               onClick={() => setActiveSection('dashboard')}
             >
               <Home size={18} /> Dashboard
             </Button>
-            <Button 
-              variant={activeSection === 'notifications' ? 'secondary' : 'ghost'} 
+            <Button
+              variant={activeSection === 'notifications' ? 'secondary' : 'ghost'}
               className="w-full justify-start gap-3 h-11 px-4 text-muted-foreground hover:text-foreground"
               onClick={() => setActiveSection('notifications')}
             >
               <Bell size={18} /> Notifications
             </Button>
-            <Button 
-              variant={activeSection === 'settings' ? 'secondary' : 'ghost'} 
+            <Button
+              variant={activeSection === 'settings' ? 'secondary' : 'ghost'}
               className="w-full justify-start gap-3 h-11 px-4 text-muted-foreground hover:text-foreground"
               onClick={() => setActiveSection('settings')}
             >
@@ -120,9 +120,9 @@ export function Apps() {
           </nav>
         </div>
 
-        <Button 
-          variant="ghost" 
-          onClick={() => logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) })} 
+        <Button
+          variant="ghost"
+          onClick={() => logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) })}
           className="w-full justify-start gap-3 h-11 px-4 text-destructive hover:bg-destructive/10"
         >
           <LogOut size={18} /> Sign Out
@@ -142,9 +142,9 @@ export function Apps() {
               <div className="flex items-center gap-3">
                 <div className="relative group flex-1 md:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Search applications..." 
+                  <input
+                    type="text"
+                    placeholder="Search applications..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-white border rounded-xl pl-10 pr-4 h-11 w-full md:w-64 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
@@ -183,7 +183,7 @@ export function Apps() {
                 {searchQuery ? `Search Results for "${searchQuery}"` : 'My Workspace'}
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               </h2>
-              
+
               {/* App Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredApps.length > 0 ? (
@@ -193,7 +193,7 @@ export function Apps() {
                         <div className={`h-14 w-14 rounded-2xl ${app.color} flex items-center justify-center text-3xl mb-6 shadow-inner group-hover:scale-110 transition-transform`}>
                           {app.icon}
                         </div>
-                        
+
                         <div className="space-y-2 mb-6 flex-grow">
                           <h3 className="text-2xl font-bold text-foreground">{app.name}</h3>
                           <p className="text-muted-foreground leading-relaxed">{app.desc}</p>
@@ -247,3 +247,4 @@ export function Apps() {
     </div>
   );
 }
+

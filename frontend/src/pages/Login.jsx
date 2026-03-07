@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useLogin } from '@/hooks/useAuth';
-import loginHero from '@/assets/Top Down.png';
+import loginHero from '@/assets/TopDown.png';
 import { ShieldCheck, Zap, Globe } from 'lucide-react';
 
 export function Login() {
@@ -18,7 +18,7 @@ export function Login() {
     e.preventDefault();
     login.mutate({ email, password });
   };
-  
+
   useEffect(() => {
     if (login.isSuccess) {
       navigate({ to: '/' });
@@ -128,3 +128,4 @@ export function Login() {
     </div>
   );
 }
+

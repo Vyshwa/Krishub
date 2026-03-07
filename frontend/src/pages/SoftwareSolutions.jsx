@@ -10,7 +10,7 @@ import { Package, BarChart3, FileText, Scan, TrendingUp, Users } from 'lucide-re
 export function SoftwareSolutions() {
   return (
     <div className="flex flex-col">
-      <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-background to-secondary/20">
+      <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-secondary/20">
         <div className="container">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
@@ -23,7 +23,7 @@ export function SoftwareSolutions() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      <section className="py-8 md:py-12">
         <div className="container">
           <div className="grid gap-12 lg:gap-16">
             <Card className="overflow-hidden border-2 hover:border-primary transition-colors">
@@ -308,7 +308,7 @@ export function SoftwareSolutions() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24 bg-muted/30">
+      <section className="py-8 md:py-12 bg-muted/30">
         <div className="container">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -331,3 +331,4 @@ export function SoftwareSolutions() {
     </div>
   );
 }
+

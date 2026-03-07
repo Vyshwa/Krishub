@@ -2,7 +2,7 @@ import { Link, useSearch } from '@tanstack/react-router';
 import heroImg from '@/assets/KrishTech Home.png';
 import softwareImg from '@/assets/Software Solutions.png';
 import hardwareImg from '@/assets/hardware.jpg';
-import logoImg from '@/assets/Top Down.png';
+import logoImg from '@/assets/TopDown.png';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Cpu, HardDrive, Shield, Zap } from 'lucide-react';
@@ -29,7 +29,7 @@ export function Home() {
                 Welcome to <span className="text-primary">KrishTech Computers</span>
               </h1>
               <p className="text-lg text-muted-foreground md:text-xl max-w-2xl">
-                Your trusted partner for comprehensive IT hardware and software solutions. 
+                Your trusted partner for comprehensive IT hardware and software solutions.
                 We deliver cutting-edge technology and exceptional service to power your business forward.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -46,10 +46,10 @@ export function Home() {
                 </Link>
               </div>
             </div>
-              <div className="relative w-full h-[340px] sm:h-[420px] md:h-[500px] lg:h-[620px] xl:h-[720px] overflow-hidden rounded-xl shadow-2xl lg:self-start lg:justify-self-end">
+            <div className="relative w-full h-[340px] sm:h-[420px] md:h-[500px] lg:h-[620px] xl:h-[720px] overflow-hidden rounded-xl shadow-2xl lg:self-start lg:justify-self-end">
               <img
                 src={logoImg}
-                alt="KrishTech Top Down"
+                alt="KrishTech"
                 className="absolute inset-0 w-full h-full object-contain p-4 transition-all duration-500 hover:scale-105"
               />
             </div>
@@ -125,7 +125,7 @@ export function Home() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      <section className="py-8 md:py-12">
         <div className="container">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
@@ -186,7 +186,7 @@ export function Home() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground">
+      <section className="py-8 md:py-12 bg-primary text-primary-foreground">
         <div className="container text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
             Ready to Transform Your IT Infrastructure?
@@ -205,3 +205,4 @@ export function Home() {
     </div>
   );
 }
+

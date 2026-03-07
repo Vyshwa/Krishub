@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRegister } from '@/hooks/useAuth';
-import loginHero from '@/assets/Top Down.png';
+import loginHero from '@/assets/LeftRight.png';
 import { ShieldCheck, UserPlus, Globe } from 'lucide-react';
 
 export function Register() {
@@ -19,10 +19,10 @@ export function Register() {
     e.preventDefault();
     register.mutate({ name, email, password });
   };
-  
+
   useEffect(() => {
     if (register.isSuccess) {
-      navigate({ to: '/apps' });
+      navigate({ to: '/' });
     }
   }, [register.isSuccess, navigate]);
 
@@ -124,7 +124,7 @@ export function Register() {
                 Already have an account?{' '}
                 <Link to="/login" className="text-primary font-bold hover:underline transition-all">
                   Sign in
-                  </Link>
+                </Link>
               </p>
             </div>
             {register.isError && (
@@ -138,3 +138,4 @@ export function Register() {
     </div>
   );
 }
+

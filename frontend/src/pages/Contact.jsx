@@ -36,7 +36,7 @@ export function Contact() {
     <div className="flex flex-col">
       <Toaster />
 
-      <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-background to-secondary/20">
+      <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-secondary/20">
         <div className="container">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
@@ -49,7 +49,7 @@ export function Contact() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      <section className="py-10 md:py-14">
         <div className="container">
           <div className="grid gap-12 lg:grid-cols-2">
             <div className="space-y-8">
@@ -176,3 +176,4 @@ export function Contact() {
     </div>
   );
 }
+
