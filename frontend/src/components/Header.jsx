@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useRouterState, useNavigate } from '@tanstack/react-router';
-import { Menu, ExternalLink } from 'lucide-react';
+import { Menu, ExternalLink, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -10,6 +10,8 @@ import { AppLauncher } from '@/components/AppLauncher';
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: user } = useCurrentUser();
+  const logout = useLogout();
+  const navigate = useNavigate();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
 
@@ -29,6 +31,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center space-x-2">
+            <Logo size="sm" />
             <span className="text-xl font-bold tracking-tight text-primary">KrishTech</span>
           </Link>
         </div>
@@ -73,12 +76,24 @@ export function Header() {
                   </Button>
                 </Link>
               ))}
-              <div className="pt-4 mt-4 border-t">
+              <div className="pt-4 mt-4 border-t space-y-2">
                 <Link to="/?view=marketing" onClick={() => setIsOpen(false)}>
                   <Button variant="ghost" className="w-full justify-start gap-3 h-11 px-4 text-muted-foreground hover:text-primary">
                     <ExternalLink size={18} /> Main Website
                   </Button>
                 </Link>
+                {user && (
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3 h-11 px-4 text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setIsOpen(false);
+                      logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) });
+                    }}
+                  >
+                    <LogOut size={18} className="rotate-180" /> Sign Out
+                  </Button>
+                )}
               </div>
             </nav>
           </SheetContent>

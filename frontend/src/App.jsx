@@ -35,6 +35,11 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  validateSearch: (search) => {
+    return {
+      view: search?.view || undefined,
+    };
+  },
   component: Home,
 });
 
