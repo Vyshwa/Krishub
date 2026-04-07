@@ -89,46 +89,48 @@ async function seedProjects() {
   const Projects = db.collection('projects');
   const count = await Projects.countDocuments();
   if (count > 0) return;
+  const defaults = { code: '', gitBranch: 'main', installCommand: 'npm install', buildCommand: 'npm run build', status: 'active', lastDeployedAt: null, createdAt: new Date(), updatedAt: new Date() };
   const seeds = [
     {
-      name: 'reNote',
-      frontendPath: '/home/vyshwa/web/reNote/FE',
-      backendPath: '/home/vyshwa/web/reNote/BE',
+      ...defaults, name: 'reNote', code: 'RENOTE', type: 'fullstack',
+      frontendPath: '/home/vyshwa/web/reNote/FE', backendPath: '/home/vyshwa/web/reNote/BE',
       frontendPort: 6001, backendPort: 6003,
-      frontendService: { type: 'pm2', name: 'renote-frontend' },
-      backendService: { type: 'pm2', name: 'renote-backend' },
+      pm2FrontendName: 'renote-frontend', pm2BackendName: 'renote-backend',
+      systemdFrontendName: null, systemdBackendName: null,
+      gitFrontend: null, gitBackend: null,
     },
     {
-      name: 'ReGen',
-      frontendPath: '/home/vyshwa/web/reGen/frontend',
-      backendPath: '/home/vyshwa/web/reGen/server',
-      frontendPort: null, backendPort: 5006,
-      frontendService: null,
-      backendService: { type: 'pm2', name: 'regen-backend' },
+      ...defaults, name: 'ReGen', code: 'REGEN', type: 'fullstack',
+      frontendPath: '/home/vyshwa/web/reGen/frontend', backendPath: '/home/vyshwa/web/reGen/server',
+      frontendPort: 2000, backendPort: 5006,
+      pm2FrontendName: null, pm2BackendName: 'regen-backend',
+      systemdFrontendName: null, systemdBackendName: null,
+      gitFrontend: null, gitBackend: null,
     },
     {
-      name: 'KrishHub',
-      frontendPath: '/home/vyshwa/web/krishub/frontend',
-      backendPath: '/home/vyshwa/web/krishub/backend',
+      ...defaults, name: 'KrishHub', code: 'KRISHUB', type: 'fullstack',
+      frontendPath: '/home/vyshwa/web/krishub/frontend', backendPath: '/home/vyshwa/web/krishub/backend',
       frontendPort: 1001, backendPort: 1002,
-      frontendService: { type: 'systemd', name: 'krishub-frontend' },
-      backendService: { type: 'systemd', name: 'krishub-backend' },
+      pm2FrontendName: null, pm2BackendName: null,
+      systemdFrontendName: 'krishub-frontend', systemdBackendName: 'krishub-backend',
+      gitFrontend: 'git@github.com:Vyshwa/Krishub.git', gitBackend: 'git@github.com:Vyshwa/Krishub.git',
     },
     {
-      name: 'Auth Service',
-      frontendPath: null,
-      backendPath: '/home/vyshwa/web/auth-service-be',
+      ...defaults, name: 'Auth Service', code: 'AUTH_SERVICE', type: 'backend',
+      frontendPath: null, backendPath: '/home/vyshwa/web/auth-service-be',
       frontendPort: null, backendPort: 3004,
-      frontendService: null,
-      backendService: { type: 'pm2', name: 'renote-auth' },
+      pm2FrontendName: null, pm2BackendName: 'renote-auth',
+      systemdFrontendName: null, systemdBackendName: null,
+      buildCommand: 'npx prisma generate && npm run build',
+      gitFrontend: null, gitBackend: null,
     },
     {
-      name: 'Reveal',
-      frontendPath: '/home/vyshwa/web/reveal/reveal-frontend',
-      backendPath: '/home/vyshwa/web/reveal/reveal-backend',
+      ...defaults, name: 'Reveal', code: 'REVEAL', type: 'fullstack',
+      frontendPath: '/home/vyshwa/web/reveal/reveal-frontend', backendPath: '/home/vyshwa/web/reveal/reveal-backend',
       frontendPort: 3000, backendPort: 5001,
-      frontendService: { type: 'pm2', name: 'reveal-frontend' },
-      backendService: { type: 'pm2', name: 'reveal-backend' },
+      pm2FrontendName: 'reveal-frontend', pm2BackendName: 'reveal-backend',
+      systemdFrontendName: null, systemdBackendName: null,
+      gitFrontend: 'git@github.com:Vyshwa/reveal-frontend.git', gitBackend: 'git@github.com:Vyshwa/reveal-backend.git',
     },
   ];
   await Projects.insertMany(seeds);
@@ -458,7 +460,12 @@ const server = http.createServer(async (req, res) => {
       if (!project) return sendJSON(res, 404, { error: 'Project not found' }, {}, requestOrigin);
 
       const targetPath = project[target === 'frontend' ? 'frontendPath' : 'backendPath'];
-      const service = project[target === 'frontend' ? 'frontendService' : 'backendService'];
+      // Resolve service config from DB fields (pm2*Name / systemd*Name)
+      const pm2Name = project[target === 'frontend' ? 'pm2FrontendName' : 'pm2BackendName'];
+      const systemdName = project[target === 'frontend' ? 'systemdFrontendName' : 'systemdBackendName'];
+      const service = pm2Name ? { type: 'pm2', name: pm2Name }
+                    : systemdName ? { type: 'systemd', name: systemdName }
+                    : null;
       if (!targetPath) return sendJSON(res, 400, { error: `No ${target} path configured` }, {}, requestOrigin);
 
       const logEntry = {
@@ -471,20 +478,23 @@ const server = http.createServer(async (req, res) => {
       };
 
       try {
+        const installCmd = project.installCommand || 'npm install';
+        const buildCmd = project.buildCommand || 'npm run build';
+
         if (action === 'git-pull') {
           const gitRoot = findGitRoot(targetPath);
           if (!gitRoot) throw new Error('Not a git repository');
           logEntry.output = await safeExec('git pull', gitRoot);
         } else if (action === 'install') {
-          logEntry.output = await safeExec('npm install', targetPath);
+          logEntry.output = await safeExec(installCmd, targetPath);
         } else if (action === 'build') {
-          logEntry.output = await safeExec('npm run build', targetPath);
+          logEntry.output = await safeExec(buildCmd, targetPath);
         } else if (action === 'full-deploy') {
           const gitRoot = findGitRoot(targetPath);
           const parts = [];
           if (gitRoot) parts.push(await safeExec('git pull', gitRoot));
-          parts.push(await safeExec('npm install', targetPath));
-          parts.push(await safeExec('npm run build', targetPath));
+          parts.push(await safeExec(installCmd, targetPath));
+          parts.push(await safeExec(buildCmd, targetPath));
           if (service) {
             if (service.type === 'pm2') parts.push(await safeExec(`pm2 restart ${service.name}`, targetPath));
             else if (service.type === 'systemd') parts.push(await safeExec(`sudo systemctl restart ${service.name}`, targetPath));

@@ -164,9 +164,15 @@ export function DeployDashboard() {
                     <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
                       <span>FE Port: <b className="text-foreground">{proj.frontendPort || '—'}</b></span>
                       <span>BE Port: <b className="text-foreground">{proj.backendPort || '—'}</b></span>
-                      <span>Branch: <b className="text-foreground">main</b></span>
+                      <span>Branch: <b className="text-foreground">{proj.gitBranch || 'main'}</b></span>
                       <span>Type: <b className="text-foreground">{type}</b></span>
                     </div>
+                    {(proj.gitFrontend || proj.gitBackend) && (
+                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                        {proj.gitFrontend && <span>FE: <code className="bg-muted px-1 py-0.5 rounded">{proj.gitFrontend}</code></span>}
+                        {proj.gitBackend && proj.gitBackend !== proj.gitFrontend && <span>BE: <code className="bg-muted px-1 py-0.5 rounded">{proj.gitBackend}</code></span>}
+                      </div>
+                    )}
 
                     {/* Action buttons per target */}
                     {['frontend', 'backend'].map(target => {
