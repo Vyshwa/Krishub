@@ -3,6 +3,7 @@ import './setup/consoleSilencer';
 import { ThemeProvider } from 'next-themes';
 import { initEditor } from './hooks/useEditor';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './hooks/useAuth';
 import App from './App';
 import './index.css';
 
@@ -21,8 +22,10 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" attribute="class">
-      <App />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider defaultTheme="system" attribute="class">
+        <App />
+      </ThemeProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );

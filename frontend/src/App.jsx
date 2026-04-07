@@ -7,6 +7,7 @@ import { Contact } from './pages/Contact';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Apps } from './pages/Apps';
+import { SsoRedirect } from './pages/SsoRedirect';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 
@@ -69,6 +70,9 @@ const contactRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
+  validateSearch: (search) => ({
+    redirect: search?.redirect || undefined,
+  }),
   component: Login,
 });
 const registerRoute = createRoute({
@@ -81,6 +85,14 @@ const appsRoute = createRoute({
   path: '/apps',
   component: Apps,
 });
+const ssoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sso',
+  validateSearch: (search) => ({
+    redirect: search?.redirect || undefined,
+  }),
+  component: SsoRedirect,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -91,6 +103,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   appsRoute,
+  ssoRoute,
 ]);
 
 const router = createRouter({ routeTree });

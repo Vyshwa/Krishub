@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,17 +13,22 @@ export function Login() {
   const [password, setPassword] = useState('');
   const login = useLogin();
   const navigate = useNavigate();
+  const { redirect } = useSearch({ strict: false });
 
   const onSubmit = (e) => {
     e.preventDefault();
-    login.mutate({ email, password });
+    login.mutate({ emailOrPhone: email, password });
   };
 
   useEffect(() => {
     if (login.isSuccess) {
-      navigate({ to: '/' });
+      if (redirect) {
+        navigate({ to: '/sso', search: { redirect } });
+      } else {
+        navigate({ to: '/' });
+      }
     }
-  }, [login.isSuccess, navigate]);
+  }, [login.isSuccess, navigate, redirect]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] w-full flex flex-col md:flex-row bg-background">

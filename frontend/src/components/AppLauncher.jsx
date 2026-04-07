@@ -5,15 +5,62 @@ import renoteImg from '@/assets/renote.png';
 import regenImg from '@/assets/regen.jpeg';
 import resideLogo from '@/assets/Reside logo.jpg';
 
-const apps = [
-  { name: 'Reside', href: '/', iconUrl: resideLogo },
-  { name: 'Reveal', href: 'https://reveal.krishub.in', iconUrl: revealImg, isExternal: true },
-  { name: 'Renote', href: 'https://renote.krishub.in', iconUrl: renoteImg, isExternal: true },
-  { name: 'ReGen', href: 'https://regen.krishub.in', iconUrl: regenImg, isExternal: true },
-  { name: 'Request', href: '/', color: 'bg-orange-500' },
-  { name: 'Realm', href: '/', color: 'bg-indigo-500' },
-  { name: 'Reserve', href: '/', color: 'bg-rose-500' }
+const groups = [
+  {
+    label: 'Business Tools',
+    apps: [
+      { name: 'Renote', href: 'https://renote.krishub.in', iconUrl: renoteImg, isExternal: true },
+      { name: 'ReGen', href: 'https://regen.krishub.in', iconUrl: regenImg, isExternal: true },
+      { name: 'Request', href: '/', color: 'bg-orange-500' },
+      { name: 'Reside', href: '/', iconUrl: resideLogo },
+      { name: 'Reserve', href: '/', color: 'bg-rose-500' },
+    ],
+  },
+  {
+    label: 'Enterprise Solutions',
+    apps: [
+      { name: 'Reveal', href: 'https://reveal.krishub.in', iconUrl: revealImg, isExternal: true },
+    ],
+  },
+  {
+    label: 'Games',
+    apps: [
+      { name: 'React', href: 'https://react.krishub.in', color: 'bg-cyan-500', isExternal: true },
+    ],
+  },
 ];
+
+function AppIcon({ app, onClose }) {
+  const inner = (
+    <>
+      {app.iconUrl ? (
+        <img
+          src={app.iconUrl}
+          alt={`${app.name} logo`}
+          className="h-10 w-10 rounded-md bg-white object-contain p-1 shadow-sm"
+        />
+      ) : (
+        <span className={`h-10 w-10 rounded-md ${app.color} shadow-sm`} />
+      )}
+      <span className="text-xs font-medium">{app.name}</span>
+    </>
+  );
+
+  const cls = 'flex flex-col items-center gap-2 rounded-md p-3 hover:bg-muted transition';
+
+  if (app.isExternal) {
+    return (
+      <a key={app.name} href={app.href} target="_blank" rel="noopener noreferrer" className={cls} onClick={onClose}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link key={app.name} to={app.href} className={cls} onClick={onClose}>
+      {inner}
+    </Link>
+  );
+}
 
 export function AppLauncher() {
   const [open, setOpen] = useState(false);
@@ -47,50 +94,19 @@ export function AppLauncher() {
           className="absolute right-0 mt-2 w-72 rounded-lg border bg-popover shadow-lg ring-1 ring-black/5 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95"
           data-state="open"
         >
-          <div className="p-3">
-            <div className="grid grid-cols-3 gap-3">
-              {apps.map((app) => (
-                app.isExternal ? (
-                  <a
-                    key={app.name}
-                    href={app.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 rounded-md p-3 hover:bg-muted transition"
-                    onClick={() => setOpen(false)}
-                  >
-                    {app.iconUrl ? (
-                      <img
-                        src={app.iconUrl}
-                        alt={`${app.name} logo`}
-                        className="h-10 w-10 rounded-md bg-white object-contain p-1 shadow-sm"
-                      />
-                    ) : (
-                      <span className={`h-10 w-10 rounded-md ${app.color} shadow-sm`} />
-                    )}
-                    <span className="text-xs font-medium">{app.name}</span>
-                  </a>
-                ) : (
-                  <Link
-                    key={app.name}
-                    to={app.href}
-                    className="flex flex-col items-center gap-2 rounded-md p-3 hover:bg-muted transition"
-                    onClick={() => setOpen(false)}
-                  >
-                    {app.iconUrl ? (
-                      <img
-                        src={app.iconUrl}
-                        alt={`${app.name} logo`}
-                        className="h-10 w-10 rounded-md bg-white object-contain p-1 shadow-sm"
-                      />
-                    ) : (
-                      <span className={`h-10 w-10 rounded-md ${app.color} shadow-sm`} />
-                    )}
-                    <span className="text-xs font-medium">{app.name}</span>
-                  </Link>
-                )
-              ))}
-            </div>
+          <div className="p-3 space-y-3">
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 px-1">
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {group.apps.map((app) => (
+                    <AppIcon key={app.name} app={app} onClose={() => setOpen(false)} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

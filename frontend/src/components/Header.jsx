@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useRouterState, useNavigate } from '@tanstack/react-router';
-import { Menu, ExternalLink, LogOut } from 'lucide-react';
+import { Menu, ExternalLink, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -110,13 +110,24 @@ function AuthActions() {
 
   if (user) {
     return (
-      <div className="flex items-center gap-4">
-        <Link
-          to="/"
-          className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer hidden lg:inline-block"
-        >
-          {user.name}
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-muted-foreground hidden lg:inline-block">
+          {user.fullName || user.name || 'User'}
+        </span>
+        <Link to="/apps">
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Settings className="h-4 w-4" />
+          </Button>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 gap-1.5"
+          onClick={() => logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) })}
+        >
+          <LogOut className="h-4 w-4 rotate-180" />
+          <span className="hidden lg:inline">Sign Out</span>
+        </Button>
       </div>
     );
   }

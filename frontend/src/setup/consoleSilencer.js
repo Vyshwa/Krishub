@@ -20,3 +20,11 @@ console.error = (...args) => {
   }
   origError(...args);
 };
+
+// Suppress errors from browser extensions (content-link.js, brg.js, content.js, etc.)
+window.addEventListener('error', (e) => {
+  const src = e.filename || '';
+  if (src.startsWith('chrome-extension://') || src.startsWith('moz-extension://') || src.includes('content-link.js') || src.includes('brg.js')) {
+    e.preventDefault();
+  }
+});
