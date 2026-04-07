@@ -21,6 +21,7 @@ export function Footer() {
               <li><a href="/about" className="hover:text-primary transition-colors">About Us</a></li>
               <li><a href="/software" className="hover:text-primary transition-colors">Software Solutions</a></li>
               <li><a href="/hardware" className="hover:text-primary transition-colors">Hardware Services</a></li>
+              <li><a href="/pricing" className="hover:text-primary transition-colors">Pricing</a></li>
               <li><a href="/contact" className="hover:text-primary transition-colors">Contact Us</a></li>
             </ul>
           </div>
@@ -49,10 +50,15 @@ export function Footer() {
 
         <Separator className="my-8" />
 
-        <div className="text-center text-sm text-muted-foreground">
-          <p className="flex items-center justify-center gap-1">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <p className="flex items-center gap-1">
             Made with ❤️ by KrisHub
           </p>
+          <div className="flex items-center gap-4">
+            <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>
+            <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+            <a href="/refund" className="hover:text-primary transition-colors">Refund Policy</a>
+          </div>
         </div>
       </div>
     </footer>

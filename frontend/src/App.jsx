@@ -8,6 +8,10 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Apps } from './pages/Apps';
 import { SsoRedirect } from './pages/SsoRedirect';
+import { Pricing } from './pages/Pricing';
+import { Privacy } from './pages/Privacy';
+import { Terms } from './pages/Terms';
+import { Refund } from './pages/Refund';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 
@@ -93,6 +97,26 @@ const ssoRoute = createRoute({
   }),
   component: SsoRedirect,
 });
+const pricingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pricing',
+  component: Pricing,
+});
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy',
+  component: Privacy,
+});
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terms',
+  component: Terms,
+});
+const refundRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/refund',
+  component: Refund,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -104,6 +128,10 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   appsRoute,
   ssoRoute,
+  pricingRoute,
+  privacyRoute,
+  termsRoute,
+  refundRoute,
 ]);
 
 const router = createRouter({ routeTree });
