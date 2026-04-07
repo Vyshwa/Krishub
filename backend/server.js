@@ -6,10 +6,31 @@ const jwt = require('jsonwebtoken');
 const { exec } = require('child_process');
 const { existsSync } = require('fs');
 const path = require('path');
+const { WebSocketServer } = require('ws');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 1002;
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3004/api/v1';
+const AUTH_ADMIN_EMAIL = process.env.AUTH_ADMIN_EMAIL || 'info@krishub.in';
+const AUTH_ADMIN_PASSWORD = process.env.AUTH_ADMIN_PASSWORD || '';
+
+// Cached super-admin token for auth-service /admin/* endpoints
+let _adminToken = null;
+let _adminTokenExp = 0;
+async function getAdminToken() {
+  if (_adminToken && Date.now() < _adminTokenExp) return _adminToken;
+  const r = await fetch(`${AUTH_SERVICE_URL}/auth-service-admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: AUTH_ADMIN_EMAIL, password: AUTH_ADMIN_PASSWORD }),
+  });
+  const d = await r.json();
+  const token = d?.data?.accessToken;
+  if (!token) throw new Error('Failed to obtain admin token');
+  _adminToken = token;
+  _adminTokenExp = Date.now() + 14 * 60 * 1000; // cache 14 min (token likely 15 min)
+  return _adminToken;
+}
 const FRONTEND_ORIGINS = [
   'http://localhost:3001', 'http://localhost:3000', 'http://localhost:1001',
   'https://krishub.in', 'https://www.krishub.in',
@@ -235,6 +256,51 @@ function findGitRoot(dirPath) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  PM2 Metrics History + WebSocket                                    */
+/* ------------------------------------------------------------------ */
+const METRICS_INTERVAL = 3000;       // collect every 3 s
+const METRICS_MAX_POINTS = 1200;     // keep ~1 hour at 3 s intervals
+const metricsHistory = {};           // { procName: [ { ts, cpu, mem } ] }
+let latestPm2Snapshot = [];          // latest full PM2 snapshot
+
+function collectPm2Metrics() {
+  exec('pm2 jlist', { timeout: 10000 }, (err, stdout) => {
+    if (err) return;
+    try {
+      const procs = JSON.parse(stdout);
+      const now = Date.now();
+      latestPm2Snapshot = procs.map(p => ({
+        name: p.name, pid: p.pid, status: p.pm2_env?.status || 'unknown',
+        cpu: p.monit?.cpu || 0, memory: p.monit?.memory || 0,
+        uptime: p.pm2_env?.pm_uptime || 0,
+      }));
+      for (const p of latestPm2Snapshot) {
+        if (!metricsHistory[p.name]) metricsHistory[p.name] = [];
+        const arr = metricsHistory[p.name];
+        arr.push({ ts: now, cpu: p.cpu, mem: +(p.memory / 1024 / 1024).toFixed(1) });
+        if (arr.length > METRICS_MAX_POINTS) arr.splice(0, arr.length - METRICS_MAX_POINTS);
+      }
+      // broadcast to subscribed WS clients
+      for (const ws of wsClients) {
+        if (ws.readyState !== 1) continue;
+        if (ws._subAll) {
+          ws.send(JSON.stringify({ type: 'snapshot', procs: latestPm2Snapshot }));
+        }
+        if (ws._subProc) {
+          const h = metricsHistory[ws._subProc];
+          if (h) {
+            const last = h[h.length - 1];
+            ws.send(JSON.stringify({ type: 'metrics', name: ws._subProc, point: last }));
+          }
+        }
+      }
+    } catch {}
+  });
+}
+
+const wsClients = new Set();
+
+/* ------------------------------------------------------------------ */
 /*  HTTP server                                                        */
 /* ------------------------------------------------------------------ */
 const server = http.createServer(async (req, res) => {
@@ -380,36 +446,72 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { success: true }, {}, requestOrigin);
     }
 
-    /* ---------- USERS (proxy to auth-service admin API) ---------- */
+    /* ---------- USERS (proxy to auth-service admin API via super-admin token) ---------- */
     if (pathname === '/api/users' && req.method === 'GET') {
-      const result = await proxyAuth('GET', '/admin/users', null, req.headers.cookie, req.headers.authorization);
-      return sendJSON(res, result.status, result.data, {}, requestOrigin);
-    }
-
-    /* ---------- DEPLOY PM2 STATUS ---------- */
-    if (pathname === '/api/deploy/pm2-status' && req.method === 'GET') {
       try {
-        const raw = await safeExec('pm2 jlist', '/tmp');
-        const procs = JSON.parse(raw).map(p => ({
-          name: p.name, pid: p.pid, status: p.pm2_env?.status || 'unknown',
-          cpu: p.monit?.cpu || 0, memory: p.monit?.memory || 0,
-          uptime: p.pm2_env?.pm_uptime || 0,
+        const adminToken = await getAdminToken();
+        const appCodes = ['KRISHUB', 'RENOTE', 'REGEN', 'REVEAL'];
+        // id -> merged user record
+        const userMap = new Map();
+        for (const appCode of appCodes) {
+          const r = await fetch(`${AUTH_SERVICE_URL}/admin/users?appCode=${appCode}&limit=1000`, {
+            headers: { Authorization: `Bearer ${adminToken}` },
+          });
+          if (!r.ok) continue;
+          const d = await r.json();
+          const items = d?.data?.items || [];
+          for (const u of items) {
+            const role = u.role?.code || 'USER';
+            const existing = userMap.get(u.id);
+            if (existing) {
+              // Merge: PARAM > ADMIN > others
+              if (role === 'PARAM' && existing.role !== 'PARAM') {
+                existing.role = 'PARAM';
+                existing.app = 'ALL';
+              } else if (role === 'ADMIN' && existing.role !== 'PARAM') {
+                existing.role = 'ADMIN';
+                existing.app = 'ALL';
+              }
+              if (!existing.apps.includes(appCode)) existing.apps.push(appCode);
+            } else {
+              userMap.set(u.id, {
+                id: u.id,
+                name: u.fullName,
+                email: u.email,
+                phone: u.phone || null,
+                app: role === 'PARAM' ? 'ALL' : appCode,
+                role,
+                status: u.isBlocked ? 'Blocked' : 'Active',
+                apps: [appCode],
+              });
+            }
+          }
+        }
+        // Deduplicate PARAM users that exist as separate auth accounts (same phone or naming pattern)
+        const allUsers = [...userMap.values()].map(u => ({
+          id: u.id, name: u.name, email: u.email, phone: u.phone,
+          app: u.app, role: u.role, status: u.status,
         }));
-        return sendJSON(res, 200, procs, {}, requestOrigin);
-      } catch(e) {
+        return sendJSON(res, 200, allUsers, {}, requestOrigin);
+      } catch (e) {
         return sendJSON(res, 500, { error: e.message }, {}, requestOrigin);
       }
     }
 
+    /* ---------- DEPLOY PM2 STATUS ---------- */
+    if (pathname === '/api/deploy/pm2-status' && req.method === 'GET') {
+      return sendJSON(res, 200, latestPm2Snapshot, {}, requestOrigin);
+    }
+
     /* ---------- DEPLOY HEALTH CHECKS ---------- */
     if (pathname === '/api/deploy/health-checks' && req.method === 'GET') {
-      const pool = await ensurePg();
-      const { rows: apps } = await pool.query('SELECT name, frontend_port, backend_port FROM workspaces WHERE status=$1', ['active']);
+      await ensureDb();
+      const apps = await db.collection('projects').find({ status: 'active' }).toArray();
       const checks = [];
       for (const app of apps) {
         const entry = { name: app.name, frontend: null, backend: null };
         for (const side of ['frontend', 'backend']) {
-          const port = app[`${side}_port`];
+          const port = app[`${side}Port`];
           if (!port) continue;
           const start = Date.now();
           try {
@@ -551,6 +653,44 @@ const server = http.createServer(async (req, res) => {
     await seedWorkspaces();
     await ensureDb();
     await seedProjects();
+    // WebSocket server — handle upgrade only for /ws path
+    const wss = new WebSocketServer({ noServer: true });
+    server.on('upgrade', (request, socket, head) => {
+      const { pathname } = url.parse(request.url);
+      if (pathname === '/ws') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
+    wss.on('connection', (ws) => {
+      wsClients.add(ws);
+      ws._subAll = false;
+      ws._subProc = null;
+      ws.on('message', (raw) => {
+        try {
+          const msg = JSON.parse(raw);
+          if (msg.type === 'subscribe-all') {
+            ws._subAll = true;
+            ws.send(JSON.stringify({ type: 'snapshot', procs: latestPm2Snapshot }));
+          } else if (msg.type === 'subscribe-proc') {
+            ws._subProc = msg.name;
+            const h = metricsHistory[msg.name] || [];
+            ws.send(JSON.stringify({ type: 'history', name: msg.name, points: h }));
+          } else if (msg.type === 'unsubscribe-proc') {
+            ws._subProc = null;
+          }
+        } catch {}
+      });
+      ws.on('close', () => wsClients.delete(ws));
+    });
+
+    // Start metrics collector
+    collectPm2Metrics();
+    setInterval(collectPm2Metrics, METRICS_INTERVAL);
+
     server.listen(PORT, () => console.log(`KrishHub backend listening on http://localhost:${PORT}`));
   } catch (err) {
     console.error('Startup error:', err);

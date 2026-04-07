@@ -7,6 +7,9 @@ import { LayoutDashboard, ExternalLink, Home, Settings, LogOut, Search, Bell, Gl
 import { WorkspaceApps } from './console/WorkspaceApps';
 import { UsersPanel } from './console/UsersPanel';
 import { DeployDashboard } from './console/DeployDashboard';
+import { usePm2Metrics } from '@/hooks/usePm2Metrics';
+import { Pm2Section } from '@/components/console/Pm2Section';
+import { HealthSection } from '@/components/console/HealthSection';
 
 export function Apps() {
   const { data: user, isLoading } = useCurrentUser();
@@ -15,6 +18,7 @@ export function Apps() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
+  const { pm2Procs, pm2Sparklines, healthChecks, wsRef } = usePm2Metrics();
 
   if (isLoading) {
     return (
@@ -158,13 +162,29 @@ export function Apps() {
                 </div>
               </div>
               <div className="bg-card border rounded-2xl p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 font-bold">99%</div>
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold ${(() => {
+                  const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
+                  const up = all.filter(v => v >= 0).length;
+                  const pct = all.length ? Math.round((up / all.length) * 100) : 0;
+                  return pct >= 90 ? 'bg-emerald-500/10 text-emerald-500' : pct >= 50 ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500';
+                })()}`}>{(() => {
+                  const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
+                  const up = all.filter(v => v >= 0).length;
+                  return all.length ? Math.round((up / all.length) * 100) + '%' : '—';
+                })()}</div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">System Uptime</div>
-                  <div className="font-bold">Operational</div>
+                  <div className="font-bold">{(() => {
+                    const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
+                    const up = all.filter(v => v >= 0).length;
+                    return up === all.length && all.length > 0 ? 'All Systems Go' : 'Degraded';
+                  })()}</div>
                 </div>
               </div>
             </div>
+
+            <Pm2Section pm2Procs={pm2Procs} pm2Sparklines={pm2Sparklines} wsRef={wsRef} />
+            <HealthSection healthChecks={healthChecks} />
 
             <div className="space-y-6">
               <h2 className="text-xl font-bold flex items-center gap-2">

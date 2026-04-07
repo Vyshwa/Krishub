@@ -4,6 +4,7 @@ import revealImg from '@/assets/Reveal.jpeg';
 import renoteImg from '@/assets/renote.png';
 import regenImg from '@/assets/regen.jpeg';
 import resideLogo from '@/assets/Reside logo.jpg';
+import { useAuth } from '@/hooks/useAuth';
 
 const groups = [
   {
@@ -30,7 +31,7 @@ const groups = [
   },
 ];
 
-function AppIcon({ app, onClose }) {
+function AppIcon({ app, onClose, ssoToken }) {
   const inner = (
     <>
       {app.iconUrl ? (
@@ -49,8 +50,12 @@ function AppIcon({ app, onClose }) {
   const cls = 'flex flex-col items-center gap-2 rounded-md p-3 hover:bg-muted transition';
 
   if (app.isExternal) {
+    // Append sso_token if user is logged into KrishHub
+    const href = ssoToken
+      ? `${app.href}${app.href.includes('?') ? '&' : '?'}sso_token=${encodeURIComponent(ssoToken)}`
+      : app.href;
     return (
-      <a key={app.name} href={app.href} target="_blank" rel="noopener noreferrer" className={cls} onClick={onClose}>
+      <a key={app.name} href={href} target="_blank" rel="noopener noreferrer" className={cls} onClick={onClose}>
         {inner}
       </a>
     );
@@ -65,6 +70,8 @@ function AppIcon({ app, onClose }) {
 export function AppLauncher() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const { isAuthenticated } = useAuth();
+  const ssoToken = isAuthenticated ? localStorage.getItem('krishub_sso') : null;
 
   useEffect(() => {
     function onDocClick(e) {
@@ -102,7 +109,7 @@ export function AppLauncher() {
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {group.apps.map((app) => (
-                    <AppIcon key={app.name} app={app} onClose={() => setOpen(false)} />
+                    <AppIcon key={app.name} app={app} onClose={() => setOpen(false)} ssoToken={ssoToken} />
                   ))}
                 </div>
               </div>

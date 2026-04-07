@@ -1,52 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Rocket, RefreshCw, ChevronDown, ChevronUp, GitBranch, Download, Hammer, Zap, RotateCcw, Square, Play, Wrench, Activity } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || '';
-
-function formatUptime(ts) {
-  if (!ts) return '—';
-  const ms = Date.now() - ts;
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function formatMem(bytes) {
-  if (!bytes) return '0';
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-}
+import { Rocket, RefreshCw, ChevronDown, ChevronUp, GitBranch, Download, Hammer, Zap, RotateCcw, Square, Play, Wrench, Box } from 'lucide-react';
 
 export function DeployDashboard() {
-  const [pm2Procs, setPm2Procs] = useState([]);
-  const [healthChecks, setHealthChecks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [actionLoading, setActionLoading] = useState(null);
   const [actionResult, setActionResult] = useState(null);
 
-  const fetchAll = useCallback(async () => {
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const [pm2Res, healthRes, projRes] = await Promise.all([
-        fetch(`${API}/api/deploy/pm2-status`),
-        fetch(`${API}/api/deploy/health-checks`),
-        fetch(`${API}/api/deploy/projects`),
-      ]);
-      if (pm2Res.ok) setPm2Procs(await pm2Res.json());
-      if (healthRes.ok) setHealthChecks(await healthRes.json());
-      if (projRes.ok) setProjects(await projRes.json());
+      const API = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${API}/api/deploy/projects`);
+      if (res.ok) setProjects(await res.json());
     } catch {}
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
   const runAction = async (projectId, action, target) => {
+    const API = import.meta.env.VITE_API_URL || '';
     const key = `${projectId}-${action}-${target}`;
     setActionLoading(key);
     setActionResult(null);
@@ -62,7 +40,7 @@ export function DeployDashboard() {
       setActionResult({ key, status: 'error', output: e.message });
     }
     setActionLoading(null);
-    fetchAll();
+    fetchProjects();
   };
 
   return (
@@ -71,66 +49,10 @@ export function DeployDashboard() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Rocket className="h-6 w-6" /> Deployment Dashboard
         </h1>
-        <Button variant="ghost" size="icon" onClick={fetchAll} disabled={loading}>
+        <Button variant="ghost" size="icon" onClick={fetchProjects} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
-
-      {/* PM2 Processes */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">📦 PM2 Processes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {pm2Procs.map(p => (
-            <div key={p.name} className="border rounded-lg p-4 bg-card flex items-start gap-3">
-              <span className={`h-2.5 w-2.5 rounded-full mt-1.5 ${p.status === 'online' ? 'bg-green-500' : p.status === 'stopped' ? 'bg-red-500' : 'bg-yellow-500'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold truncate">{p.name}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status === 'online' ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {p.status}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  CPU: {p.cpu}% · RAM: {formatMem(p.memory)} · Up: {formatUptime(p.uptime)}
-                </p>
-              </div>
-            </div>
-          ))}
-          {pm2Procs.length === 0 && !loading && (
-            <p className="text-muted-foreground col-span-full">No PM2 processes found</p>
-          )}
-        </div>
-      </section>
-
-      {/* Health Checks */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2"><Activity className="h-5 w-5" /> Health Checks</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {healthChecks.map(h => (
-            <div key={h.name} className="border rounded-lg p-4 bg-card">
-              <h3 className="font-semibold mb-2">{h.name}</h3>
-              {h.frontend !== null && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5">
-                    <span className={`h-2 w-2 rounded-full ${h.frontend >= 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-                    frontend
-                  </span>
-                  <span className="text-muted-foreground">{h.frontend >= 0 ? `${h.frontend}ms` : 'down'}</span>
-                </div>
-              )}
-              {h.backend !== null && (
-                <div className="flex items-center justify-between text-sm mt-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className={`h-2 w-2 rounded-full ${h.backend >= 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-                    backend
-                  </span>
-                  <span className="text-muted-foreground">{h.backend >= 0 ? `${h.backend}ms` : 'down'}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Projects */}
       <section className="space-y-3">
@@ -147,7 +69,7 @@ export function DeployDashboard() {
               <div key={id} className="border rounded-xl bg-card overflow-hidden">
                 <button className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition" onClick={() => toggle(id)}>
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">⚙️</span>
+                    <Box className="h-7 w-7 text-blue-500" strokeWidth={2} />
                     <div className="text-left">
                       <span className="font-bold">{proj.name}</span>
                       <span className="text-xs text-muted-foreground ml-2">{proj.name.toUpperCase().replace(/\s+/g, '_')} · {type}</span>
@@ -178,9 +100,14 @@ export function DeployDashboard() {
                     {['frontend', 'backend'].map(target => {
                       const path = proj[target === 'frontend' ? 'frontendPath' : 'backendPath'];
                       if (!path) return null;
+                      const hasService = !!(
+                        proj[target === 'frontend' ? 'pm2FrontendName' : 'pm2BackendName'] ||
+                        proj[target === 'frontend' ? 'systemdFrontendName' : 'systemdBackendName']
+                      );
+                      const serviceActions = ['restart', 'stop', 'start'];
                       return (
                         <div key={target} className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase">{target}</p>
+                          <p className="text-xs font-medium text-muted-foreground uppercase">{target}{!hasService && ' (static)'}</p>
                           <div className="flex flex-wrap gap-2">
                             {[
                               { action: 'git-pull', label: 'Git Pull', Icon: GitBranch },
@@ -190,7 +117,8 @@ export function DeployDashboard() {
                               { action: 'restart', label: 'Restart', Icon: RotateCcw },
                               { action: 'stop', label: 'Stop', Icon: Square },
                               { action: 'start', label: 'Start', Icon: Play },
-                            ].map(({ action, label, Icon, variant }) => {
+                            ].filter(({ action }) => hasService || !serviceActions.includes(action))
+                            .map(({ action, label, Icon, variant }) => {
                               const key = `${id}-${action}-${target}`;
                               return (
                                 <Button

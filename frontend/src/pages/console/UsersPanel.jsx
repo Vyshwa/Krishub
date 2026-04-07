@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Plus, RefreshCw, Search, Pencil, Trash2, Bell, KeyRound } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Users, Plus, RefreshCw, Search, Pencil, Trash2, Ban, KeyRound, X } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -11,6 +13,7 @@ const ROLE_COLORS = {
   OWNER: 'bg-blue-500/20 text-blue-400',
   STAFF: 'bg-cyan-500/20 text-cyan-400',
   USER: 'bg-slate-500/20 text-slate-400',
+  INTERN: 'bg-teal-500/20 text-teal-400',
 };
 
 const APP_COLORS = {
@@ -21,22 +24,109 @@ const APP_COLORS = {
   ALL: 'bg-green-600',
 };
 
+const APP_OPTIONS = ['KRISHUB', 'RENOTE', 'REGEN', 'REVEAL'];
+
+function AddUserDialog({ open, onClose, onSuccess }) {
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', appCode: 'KRISHUB' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const body = { ...form };
+      if (!body.email) delete body.email;
+      if (!body.phone) delete body.phone;
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to create user');
+      onSuccess?.();
+      onClose();
+      setForm({ fullName: '', email: '', phone: '', password: '', appCode: 'KRISHUB' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-popover border rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Add User</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <Label htmlFor="au-name">Full Name *</Label>
+            <Input id="au-name" required minLength={3} value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} placeholder="John Doe" />
+          </div>
+          <div>
+            <Label htmlFor="au-email">Email</Label>
+            <Input id="au-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
+          </div>
+          <div>
+            <Label htmlFor="au-phone">Phone</Label>
+            <Input id="au-phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" />
+          </div>
+          <div>
+            <Label htmlFor="au-pass">Password *</Label>
+            <Input id="au-pass" type="password" required minLength={8} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" />
+          </div>
+          <div>
+            <Label htmlFor="au-app">App *</Label>
+            <select id="au-app" className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm" value={form.appCode} onChange={e => setForm(f => ({ ...f, appCode: e.target.value }))}>
+              {APP_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function UsersPanel() {
+  const { accessToken, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('All');
+  const [showAddUser, setShowAddUser] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    if (!accessToken) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/users`);
-      if (res.ok) setUsers(await res.json());
+      const res = await fetch(`${API}/api/users`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : data.users || data.data || []);
+      }
     } catch {}
     setLoading(false);
-  }, []);
+  }, [accessToken]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    if (!authLoading && accessToken) fetchUsers();
+  }, [authLoading, accessToken, fetchUsers]);
 
   // Get unique app codes for tabs
   const appCounts = {};
@@ -58,18 +148,22 @@ export function UsersPanel() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6" /> Users
           <span className="text-sm bg-muted px-2 py-0.5 rounded-full">{users.length}</span>
-          <button onClick={fetchUsers} className="ml-2">
-            <RefreshCw className={`h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </h1>
         <div className="flex items-center gap-3">
-          <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add User</Button>
+          <Button size="sm" variant="outline" onClick={fetchUsers} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowAddUser(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add User
+          </Button>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9 w-56" placeholder="Search users..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
       </div>
+
+      <AddUserDialog open={showAddUser} onClose={() => setShowAddUser(false)} onSuccess={fetchUsers} />
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
@@ -121,12 +215,15 @@ export function UsersPanel() {
                 </td>
                 <td className="p-3 text-muted-foreground">{u.status}</td>
                 <td className="p-3 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <button className="p-1.5 rounded hover:bg-muted"><Pencil className="h-4 w-4" /></button>
-                    <button className="p-1.5 rounded hover:bg-muted"><Bell className="h-4 w-4" /></button>
-                    <button className="p-1.5 rounded hover:bg-muted"><KeyRound className="h-4 w-4" /></button>
-                    <button className="p-1.5 rounded hover:bg-muted text-destructive"><Trash2 className="h-4 w-4" /></button>
-                  </div>
+                  {u.role === 'PARAM' ? (
+                    <span className="text-xs text-muted-foreground italic">Super Admin</span>
+                  ) : (
+                    <div className="flex items-center justify-end gap-1">
+                      <button className="p-1.5 rounded hover:bg-muted" title="Edit"><Pencil className="h-4 w-4" /></button>
+                      <button className="p-1.5 rounded hover:bg-muted" title="Reset Password"><KeyRound className="h-4 w-4" /></button>
+                      <button className="p-1.5 rounded hover:bg-muted text-destructive" title="Block User"><Ban className="h-4 w-4" /></button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
