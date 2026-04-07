@@ -6,6 +6,9 @@ export default defineConfig({
   server: {
     port: 3000
   },
+  preview: {
+    allowedHosts: ['krishub.in', 'www.krishub.in'],
+  },
   plugins: [react()],
   resolve: {
     alias: [
