@@ -12,6 +12,7 @@ import { Pricing } from './pages/Pricing';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { Refund } from './pages/Refund';
+import { Pair } from './pages/Pair';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 
@@ -117,6 +118,14 @@ const refundRoute = createRoute({
   path: '/refund',
   component: Refund,
 });
+const pairRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pair',
+  validateSearch: (search) => ({
+    token: search?.token || undefined,
+  }),
+  component: Pair,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -132,6 +141,7 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   termsRoute,
   refundRoute,
+  pairRoute,
 ]);
 
 const router = createRouter({ routeTree });

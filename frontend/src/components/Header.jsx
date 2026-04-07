@@ -57,6 +57,7 @@ export function Header() {
           <AppLauncher />
           <MobileLoginButton />
         </div>
+        {!isAppRoute && (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon">
@@ -98,6 +99,7 @@ export function Header() {
             </nav>
           </SheetContent>
         </Sheet>
+        )}
       </div>
     </header>
   );

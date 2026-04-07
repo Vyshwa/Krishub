@@ -3,10 +3,13 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useCurrentUser, useLogout, useAuth } from '@/hooks/useAuth';
-import { LayoutDashboard, ExternalLink, Home, Settings, LogOut, Search, Bell, Globe, Users, Rocket } from 'lucide-react';
+import { LayoutDashboard, ExternalLink, Home, Settings, LogOut, Search, Bell, Globe, Users, Rocket, Menu, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Logo } from '@/components/Logo';
 import { WorkspaceApps } from './console/WorkspaceApps';
 import { UsersPanel } from './console/UsersPanel';
 import { DeployDashboard } from './console/DeployDashboard';
+import { SecuritySettings } from './console/SecuritySettings';
 import { usePm2Metrics } from '@/hooks/usePm2Metrics';
 import { Pm2Section } from '@/components/console/Pm2Section';
 import { HealthSection } from '@/components/console/HealthSection';
@@ -18,6 +21,7 @@ export function Apps() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [mobileNav, setMobileNav] = useState(false);
   const { pm2Procs, pm2Sparklines, healthChecks, wsRef } = usePm2Metrics();
 
   if (isLoading) {
@@ -92,7 +96,64 @@ export function Apps() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-background flex">
-      {/* Sidebar */}
+      {/* Mobile console nav trigger */}
+      <div className="lg:hidden fixed top-[10px] right-3 z-[60]">
+        <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+          <SheetTrigger asChild>
+            <button
+              className="relative h-10 w-10 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
+              aria-label="Console menu"
+            >
+              <span className={`absolute transition-all duration-300 ${mobileNav ? 'rotate-90 opacity-0 scale-75' : 'rotate-0 opacity-100 scale-100'}`}><Menu size={22} /></span>
+              <span className={`absolute transition-all duration-300 ${mobileNav ? 'rotate-0 opacity-100 scale-100' : '-rotate-90 opacity-0 scale-75'}`}><X size={22} /></span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
+            <SheetHeader className="p-4 pb-2 border-b">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
+                  <LayoutDashboard size={18} />
+                </div>
+                <SheetTitle className="text-lg font-bold tracking-tight">Console</SheetTitle>
+              </div>
+            </SheetHeader>
+            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+              {sidebarItems.map(item => (
+                <Button
+                  key={item.id}
+                  variant={activeSection === item.id ? 'secondary' : 'ghost'}
+                  className={`w-full justify-start gap-3 h-11 px-3 text-sm ${activeSection !== item.id ? 'text-muted-foreground hover:text-foreground' : ''}`}
+                  onClick={() => { setActiveSection(item.id); setMobileNav(false); }}
+                >
+                  <item.icon size={18} /> {item.label}
+                </Button>
+              ))}
+
+              <div className="pt-3 mt-3 border-t">
+                <Link to="/?view=marketing" onClick={() => setMobileNav(false)}>
+                  <Button variant="ghost" className="w-full justify-start gap-3 h-11 px-3 text-sm text-muted-foreground hover:text-primary">
+                    <ExternalLink size={18} /> Main Website
+                  </Button>
+                </Link>
+              </div>
+            </nav>
+            <div className="p-4 pt-2 border-t">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-11 px-3 text-sm text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  setMobileNav(false);
+                  logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) });
+                }}
+              >
+                <LogOut size={18} className="rotate-180" /> Sign Out
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-56 flex-col border-r bg-card p-4 justify-between shrink-0">
         <div className="space-y-6">
           <div className="flex items-center gap-2 px-2 py-1">
@@ -234,13 +295,7 @@ export function Apps() {
             <p className="text-muted-foreground text-lg">You're all caught up! No recent activity to show.</p>
           </div>
         )}
-        {activeSection === 'settings' && (
-          <div className="p-6 md:p-10 max-w-6xl mx-auto text-center py-40">
-            <Settings size={64} className="mx-auto text-muted-foreground/30 mb-6" />
-            <h2 className="text-3xl font-bold mb-2">Settings</h2>
-            <p className="text-muted-foreground text-lg">Console settings and profile management are coming soon.</p>
-          </div>
-        )}
+        {activeSection === 'settings' && <SecuritySettings />}
       </main>
     </div>
   );

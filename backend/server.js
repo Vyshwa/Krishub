@@ -7,7 +7,35 @@ const { exec } = require('child_process');
 const { existsSync } = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
+const { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
 require('dotenv').config();
+
+// WebAuthn / Passkey config
+const RP_NAME = 'KrishHub';
+const RP_ID = process.env.WEBAUTHN_RP_ID || 'krishub.in';
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || 'https://krishub.in';
+
+// AES-256-GCM encryption for sensitive data (recovery emails etc.)
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.createHash('sha256').update('krishub-default-enc-key-change-me').digest();
+function encrypt(text) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  let enc = cipher.update(text, 'utf8', 'hex');
+  enc += cipher.final('hex');
+  const tag = cipher.getAuthTag().toString('hex');
+  return iv.toString('hex') + ':' + enc + ':' + tag;
+}
+function decrypt(blob) {
+  const [ivHex, enc, tagHex] = blob.split(':');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  let dec = decipher.update(enc, 'hex', 'utf8');
+  dec += decipher.final('utf8');
+  return dec;
+}
 
 const PORT = process.env.PORT || 1002;
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3004/api/v1';
@@ -105,6 +133,30 @@ async function ensureDb() {
   db = client.db(DB_NAME);
 }
 
+async function seedRecoveryEmails() {
+  await ensureDb();
+  const col = db.collection('recovery_emails');
+  const SEED_EMAILS = [
+    'admin@krishub.in',
+    'info@krishub.in',
+    'vyshwa@gmail.com',
+    'email2jai@rediffmail.com',
+    'priyanka.cbe@gmail.com',
+    'yuvamcse@gmail.com',
+  ];
+  const existing = await col.find({}).toArray();
+  const existingPlain = existing.map(d => decrypt(d.emailEncrypted).toLowerCase());
+  const missing = SEED_EMAILS.filter(e => !existingPlain.includes(e.toLowerCase()));
+  if (missing.length === 0) return;
+  const docs = missing.map(e => ({
+    emailEncrypted: encrypt(e),
+    verified: true,
+    createdAt: new Date(),
+  }));
+  await col.insertMany(docs);
+  console.log(`Seeded ${docs.length} recovery email(s) (encrypted)`);
+}
+
 async function seedProjects() {
   await ensureDb();
   const Projects = db.collection('projects');
@@ -163,6 +215,17 @@ async function seedProjects() {
 function makeSsoToken(userId) {
   if (!JWT_SECRET) return null;
   return jwt.sign({ sub: userId, type: 'sso' }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+/* ---- Extract userId from Authorization header ---- */
+function getUserIdFromAuth(req) {
+  const auth = req.headers.authorization;
+  if (!auth || !JWT_SECRET) return null;
+  try {
+    const token = auth.replace('Bearer ', '');
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return decoded.sub || decoded.userId || null;
+  } catch { return null; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -299,6 +362,14 @@ function collectPm2Metrics() {
 }
 
 const wsClients = new Set();
+
+// Broadcast security settings update to subscribed WS clients
+function broadcastSecurityUpdate(type, payload) {
+  const msg = JSON.stringify({ type: 'security-update', subType: type, ...(payload || {}), ts: Date.now() });
+  for (const ws of wsClients) {
+    if (ws.readyState === 1 && ws._subSecurity) ws.send(msg);
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  HTTP server                                                        */
@@ -498,6 +569,582 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    /* PATCH /api/users/:userId — edit user profile or block/unblock */
+    if (pathname.match(/^\/api\/users\/[^/]+$/) && req.method === 'PATCH') {
+      try {
+        const userId = pathname.split('/').pop();
+        const adminToken = await getAdminToken();
+        const body = await readBody(req);
+        const r = await fetch(`${AUTH_SERVICE_URL}/admin/users/${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body,
+        });
+        const data = await r.json();
+        if (!r.ok) return sendJSON(res, r.status, data, {}, requestOrigin);
+        return sendJSON(res, 200, data?.data || data, {}, requestOrigin);
+      } catch (e) {
+        return sendJSON(res, 500, { error: e.message }, {}, requestOrigin);
+      }
+    }
+
+    /* PATCH /api/users/:userId/role — change user app/role */
+    if (pathname.match(/^\/api\/users\/[^/]+\/role$/) && req.method === 'PATCH') {
+      try {
+        const userId = pathname.split('/').slice(-2, -1)[0];
+        const adminToken = await getAdminToken();
+        const body = await readBody(req);
+        const r = await fetch(`${AUTH_SERVICE_URL}/admin/users/${userId}/access`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body,
+        });
+        const data = await r.json();
+        if (!r.ok) return sendJSON(res, r.status, data, {}, requestOrigin);
+        return sendJSON(res, 200, data?.data || data, {}, requestOrigin);
+      } catch (e) {
+        return sendJSON(res, 500, { error: e.message }, {}, requestOrigin);
+      }
+    }
+
+    /* DELETE /api/users/:userId — delete user */
+    if (pathname.match(/^\/api\/users\/[^/]+$/) && req.method === 'DELETE') {
+      try {
+        const userId = pathname.split('/').pop();
+        const adminToken = await getAdminToken();
+        const r = await fetch(`${AUTH_SERVICE_URL}/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        const data = await r.json();
+        if (!r.ok) return sendJSON(res, r.status, data, {}, requestOrigin);
+        return sendJSON(res, 200, data?.data || data, {}, requestOrigin);
+      } catch (e) {
+        return sendJSON(res, 500, { error: e.message }, {}, requestOrigin);
+      }
+    }
+
+    /* ================================================================== */
+    /*  SECURITY SETTINGS                                                  */
+    /* ================================================================== */
+
+    /* GET /api/settings/security — fetch current user's security settings */
+    if (pathname === '/api/settings/security' && req.method === 'GET') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId }) || {};
+      const emailDocs = await db.collection('recovery_emails').find({}).toArray();
+      const recoveryEmails = emailDocs.map(d => ({
+        id: d._id.toString(),
+        email: decrypt(d.emailEncrypted),
+        verified: !!d.verified,
+      }));
+      return sendJSON(res, 200, {
+        totpEnabled: !!doc.totpEnabled,
+        recoveryEmails,
+        recoveryEmail: doc.recoveryEmail || null,
+        recoveryEmailVerified: !!doc.recoveryEmailVerified,
+        trustedDevices: (doc.trustedDevices || []).map(d => ({
+          id: d.id, name: d.name, browser: d.browser, os: d.os,
+          ip: d.ip, lastUsed: d.lastUsed, trusted: d.trusted, createdAt: d.createdAt,
+        })),
+        passkeys: (doc.passkeys || []).map(p => ({
+          id: p.id, name: p.name, type: p.type || 'unknown',
+          createdAt: p.createdAt, lastUsed: p.lastUsed,
+        })),
+        mobilePairing: doc.mobilePairing ? {
+          deviceName: doc.mobilePairing.deviceName,
+          linkedAt: doc.mobilePairing.linkedAt,
+          os: doc.mobilePairing.os,
+          browser: doc.mobilePairing.browser,
+        } : null,
+        passphrase: doc.passphrase || null,
+        loginRestriction: doc.loginRestriction || 'none',
+      }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/totp/setup — generate TOTP secret + QR */
+    if (pathname === '/api/settings/security/totp/setup' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      const existing = await db.collection('security_settings').findOne({ userId });
+      if (existing?.totpEnabled) return sendJSON(res, 400, { error: 'TOTP already enabled. Disable first.' }, {}, requestOrigin);
+      const secret = authenticator.generateSecret();
+      const otpauth = authenticator.keyuri(userId, 'KrishHub', secret);
+      const qrDataUrl = await QRCode.toDataURL(otpauth);
+      // Store pending secret (not enabled until verified)
+      await db.collection('security_settings').updateOne(
+        { userId }, { $set: { totpPendingSecret: secret, updatedAt: new Date() } }, { upsert: true }
+      );
+      return sendJSON(res, 200, { secret, qrDataUrl }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/totp/verify — verify TOTP code to enable */
+    if (pathname === '/api/settings/security/totp/verify' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { code } = JSON.parse(await readBody(req));
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId });
+      if (!doc?.totpPendingSecret) return sendJSON(res, 400, { error: 'No TOTP setup in progress' }, {}, requestOrigin);
+      const valid = authenticator.check(code, doc.totpPendingSecret);
+      if (!valid) return sendJSON(res, 400, { error: 'Invalid code. Try again.' }, {}, requestOrigin);
+      // Generate backup codes
+      const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
+      const hashedBackups = backupCodes.map(c => crypto.createHash('sha256').update(c).digest('hex'));
+      await db.collection('security_settings').updateOne({ userId }, {
+        $set: { totpSecret: doc.totpPendingSecret, totpEnabled: true, totpBackupCodes: hashedBackups, updatedAt: new Date() },
+        $unset: { totpPendingSecret: '' },
+      });
+      broadcastSecurityUpdate('totp-enabled');
+      return sendJSON(res, 200, { enabled: true, backupCodes }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/totp/disable — disable TOTP */
+    if (pathname === '/api/settings/security/totp/disable' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { code } = JSON.parse(await readBody(req));
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId });
+      if (!doc?.totpEnabled) return sendJSON(res, 400, { error: 'TOTP is not enabled' }, {}, requestOrigin);
+      const valid = authenticator.check(code, doc.totpSecret);
+      if (!valid) return sendJSON(res, 400, { error: 'Invalid code' }, {}, requestOrigin);
+      await db.collection('security_settings').updateOne({ userId }, {
+        $set: { totpEnabled: false, updatedAt: new Date() },
+        $unset: { totpSecret: '', totpPendingSecret: '', totpBackupCodes: '' },
+      });
+      broadcastSecurityUpdate('totp-disabled');
+      return sendJSON(res, 200, { enabled: false }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/totp/validate — validate a TOTP code (for login flow) */
+    if (pathname === '/api/settings/security/totp/validate' && req.method === 'POST') {
+      const { userId, code } = JSON.parse(await readBody(req));
+      if (!userId) return sendJSON(res, 400, { error: 'userId required' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId });
+      if (!doc?.totpEnabled) return sendJSON(res, 200, { valid: true, required: false }, {}, requestOrigin);
+      // Check TOTP code
+      let valid = authenticator.check(code, doc.totpSecret);
+      // Check backup codes
+      if (!valid && code) {
+        const hashed = crypto.createHash('sha256').update(code).digest('hex');
+        const idx = (doc.totpBackupCodes || []).indexOf(hashed);
+        if (idx !== -1) {
+          valid = true;
+          const updated = [...doc.totpBackupCodes];
+          updated.splice(idx, 1);
+          await db.collection('security_settings').updateOne({ userId }, { $set: { totpBackupCodes: updated } });
+        }
+      }
+      return sendJSON(res, 200, { valid, required: true }, {}, requestOrigin);
+    }
+
+    /* PATCH /api/settings/security/passphrase — set or update passphrase */
+    if (pathname === '/api/settings/security/passphrase' && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { passphrase } = JSON.parse(await readBody(req));
+      if (!passphrase || passphrase.length < 4) return sendJSON(res, 400, { error: 'Passphrase must be at least 4 characters' }, {}, requestOrigin);
+      await ensureDb();
+      const hashed = crypto.createHash('sha256').update(passphrase).digest('hex');
+      await db.collection('security_settings').updateOne(
+        { userId }, { $set: { passphrase: hashed, updatedAt: new Date() } }, { upsert: true }
+      );
+      broadcastSecurityUpdate('passphrase-set');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/passphrase — remove passphrase */
+    if (pathname === '/api/settings/security/passphrase' && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId }, { $unset: { passphrase: '' }, $set: { updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('passphrase-removed');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* PATCH /api/settings/security/recovery-email — add a recovery email */
+    if (pathname === '/api/settings/security/recovery-email' && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { email } = JSON.parse(await readBody(req));
+      if (!email) return sendJSON(res, 400, { error: 'Email required' }, {}, requestOrigin);
+      await ensureDb();
+      // Check for duplicates by decrypting existing
+      const existing = await db.collection('recovery_emails').find({}).toArray();
+      const dup = existing.find(d => decrypt(d.emailEncrypted).toLowerCase() === email.toLowerCase());
+      if (dup) return sendJSON(res, 409, { error: 'Email already exists' }, {}, requestOrigin);
+      const result = await db.collection('recovery_emails').insertOne({
+        emailEncrypted: encrypt(email),
+        verified: true,
+        createdAt: new Date(),
+      });
+      broadcastSecurityUpdate('recovery-email-added', { id: result.insertedId.toString() });
+      return sendJSON(res, 200, { success: true, id: result.insertedId.toString() }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/recovery-email/:id — remove a recovery email */
+    if (pathname.startsWith('/api/settings/security/recovery-email/') && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const emailId = pathname.split('/').pop();
+      await ensureDb();
+      const count = await db.collection('recovery_emails').countDocuments();
+      if (count <= 1) return sendJSON(res, 400, { error: 'Must keep at least one recovery email' }, {}, requestOrigin);
+      const result = await db.collection('recovery_emails').deleteOne({ _id: new ObjectId(emailId) });
+      if (result.deletedCount === 0) return sendJSON(res, 404, { error: 'Email not found' }, {}, requestOrigin);
+      broadcastSecurityUpdate('recovery-email-removed', { id: emailId });
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* PATCH /api/settings/security/login-restriction — set login restriction */
+    if (pathname === '/api/settings/security/login-restriction' && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { restriction } = JSON.parse(await readBody(req));
+      const allowed = ['none', 'verified_mobile'];
+      if (!allowed.includes(restriction)) return sendJSON(res, 400, { error: 'Invalid restriction' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId }, { $set: { loginRestriction: restriction, updatedAt: new Date() } }, { upsert: true }
+      );
+      broadcastSecurityUpdate('login-restriction', { restriction });
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/devices/track — track a login device */
+    if (pathname === '/api/settings/security/devices/track' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const { name, browser, os } = JSON.parse(await readBody(req));
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+      await ensureDb();
+      const device = {
+        id: crypto.randomBytes(8).toString('hex'),
+        name: name || 'Unknown Device',
+        browser: browser || 'Unknown',
+        os: os || 'Unknown',
+        ip,
+        trusted: false,
+        lastUsed: new Date(),
+        createdAt: new Date(),
+      };
+      await db.collection('security_settings').updateOne(
+        { userId }, { $push: { trustedDevices: device }, $set: { updatedAt: new Date() } }, { upsert: true }
+      );
+      return sendJSON(res, 200, { device }, {}, requestOrigin);
+    }
+
+    /* PATCH /api/settings/security/devices/:deviceId/trust — toggle trust */
+    if (pathname.match(/^\/api\/settings\/security\/devices\/[^/]+\/trust$/) && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const deviceId = pathname.split('/').slice(-2, -1)[0];
+      const { trusted } = JSON.parse(await readBody(req));
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId, 'trustedDevices.id': deviceId },
+        { $set: { 'trustedDevices.$.trusted': !!trusted, updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('device-trust-toggled');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/devices/:deviceId — revoke a device */
+    if (pathname.match(/^\/api\/settings\/security\/devices\/[^/]+$/) && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const deviceId = pathname.split('/').pop();
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId }, { $pull: { trustedDevices: { id: deviceId } }, $set: { updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('device-revoked');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/devices — revoke all devices */
+    if (pathname === '/api/settings/security/devices' && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId }, { $set: { trustedDevices: [], updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('devices-revoked-all');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* PATCH /api/settings/security/devices/:deviceId/rename — rename a device */
+    if (pathname.match(/^\/api\/settings\/security\/devices\/[^/]+\/rename$/) && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const deviceId = pathname.split('/').slice(-2, -1)[0];
+      const { name } = JSON.parse(await readBody(req));
+      if (!name || name.length > 100) return sendJSON(res, 400, { error: 'Name required (max 100 chars)' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId, 'trustedDevices.id': deviceId },
+        { $set: { 'trustedDevices.$.name': name, updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('device-renamed');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* ================================================================== */
+    /*  PASSKEYS / BIOMETRIC (WebAuthn)                                    */
+    /* ================================================================== */
+
+    /* POST /api/settings/security/passkeys/register-options */
+    if (pathname === '/api/settings/security/passkeys/register-options' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId }) || {};
+      const existingCreds = (doc.passkeys || []).map(p => ({
+        id: p.credentialId,
+        transports: p.transports || [],
+      }));
+      const options = await generateRegistrationOptions({
+        rpName: RP_NAME,
+        rpID: RP_ID,
+        userName: userId,
+        attestationType: 'none',
+        excludeCredentials: existingCreds,
+        authenticatorSelection: {
+          residentKey: 'preferred',
+          userVerification: 'preferred',
+        },
+      });
+      // Store challenge temporarily
+      await db.collection('security_settings').updateOne(
+        { userId },
+        { $set: { webauthnCurrentChallenge: options.challenge, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      return sendJSON(res, 200, options, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/passkeys/register-verify */
+    if (pathname === '/api/settings/security/passkeys/register-verify' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const body = JSON.parse(await readBody(req));
+      const { attestation, name: passkeyName } = body;
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId });
+      if (!doc?.webauthnCurrentChallenge) return sendJSON(res, 400, { error: 'No registration in progress' }, {}, requestOrigin);
+      try {
+        const verification = await verifyRegistrationResponse({
+          response: attestation,
+          expectedChallenge: doc.webauthnCurrentChallenge,
+          expectedOrigin: [WEBAUTHN_ORIGIN, 'http://localhost:1001', 'http://localhost:3001'],
+          expectedRPID: RP_ID,
+        });
+        if (!verification.verified || !verification.registrationInfo) {
+          return sendJSON(res, 400, { error: 'Verification failed' }, {}, requestOrigin);
+        }
+        const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+        // Determine type from authenticator attachment / transports
+        const transports = attestation.response?.transports || [];
+        let type = 'security-key';
+        if (transports.includes('internal')) type = 'fingerprint';
+        if (transports.includes('hybrid')) type = 'mobile';
+        const passkey = {
+          id: crypto.randomBytes(8).toString('hex'),
+          credentialId: credential.id,
+          publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+          counter: credential.counter,
+          transports,
+          name: passkeyName || `Passkey ${(doc.passkeys || []).length + 1}`,
+          type,
+          deviceType: credentialDeviceType,
+          backedUp: !!credentialBackedUp,
+          createdAt: new Date(),
+          lastUsed: new Date(),
+        };
+        await db.collection('security_settings').updateOne(
+          { userId },
+          { $push: { passkeys: passkey }, $unset: { webauthnCurrentChallenge: '' }, $set: { updatedAt: new Date() } }
+        );
+        broadcastSecurityUpdate('passkey-registered');
+        return sendJSON(res, 200, { verified: true, passkey: { id: passkey.id, name: passkey.name, type: passkey.type, createdAt: passkey.createdAt } }, {}, requestOrigin);
+      } catch (e) {
+        return sendJSON(res, 400, { error: e.message || 'Verification failed' }, {}, requestOrigin);
+      }
+    }
+
+    /* POST /api/settings/security/passkeys/authenticate-options */
+    if (pathname === '/api/settings/security/passkeys/authenticate-options' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId }) || {};
+      const creds = (doc.passkeys || []).map(p => ({
+        id: p.credentialId,
+        transports: p.transports || [],
+      }));
+      if (creds.length === 0) return sendJSON(res, 400, { error: 'No passkeys registered' }, {}, requestOrigin);
+      const options = await generateAuthenticationOptions({
+        rpID: RP_ID,
+        allowCredentials: creds,
+        userVerification: 'preferred',
+      });
+      await db.collection('security_settings').updateOne(
+        { userId },
+        { $set: { webauthnCurrentChallenge: options.challenge, updatedAt: new Date() } }
+      );
+      return sendJSON(res, 200, options, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/passkeys/authenticate-verify */
+    if (pathname === '/api/settings/security/passkeys/authenticate-verify' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const body = JSON.parse(await readBody(req));
+      const { assertion } = body;
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ userId });
+      if (!doc?.webauthnCurrentChallenge) return sendJSON(res, 400, { error: 'No authentication in progress' }, {}, requestOrigin);
+      const matchedPasskey = (doc.passkeys || []).find(p => p.credentialId === assertion.id);
+      if (!matchedPasskey) return sendJSON(res, 400, { error: 'Unknown credential' }, {}, requestOrigin);
+      try {
+        const verification = await verifyAuthenticationResponse({
+          response: assertion,
+          expectedChallenge: doc.webauthnCurrentChallenge,
+          expectedOrigin: [WEBAUTHN_ORIGIN, 'http://localhost:1001', 'http://localhost:3001'],
+          expectedRPID: RP_ID,
+          credential: {
+            id: matchedPasskey.credentialId,
+            publicKey: Buffer.from(matchedPasskey.publicKey, 'base64url'),
+            counter: matchedPasskey.counter,
+            transports: matchedPasskey.transports,
+          },
+        });
+        if (verification.verified) {
+          // Update counter & lastUsed
+          await db.collection('security_settings').updateOne(
+            { userId, 'passkeys.credentialId': matchedPasskey.credentialId },
+            { $set: { 'passkeys.$.counter': verification.authenticationInfo.newCounter, 'passkeys.$.lastUsed': new Date(), updatedAt: new Date() }, $unset: { webauthnCurrentChallenge: '' } }
+          );
+        }
+        return sendJSON(res, 200, { verified: verification.verified }, {}, requestOrigin);
+      } catch (e) {
+        return sendJSON(res, 400, { error: e.message || 'Authentication failed' }, {}, requestOrigin);
+      }
+    }
+
+    /* PATCH /api/settings/security/passkeys/:id/rename — rename a passkey */
+    if (pathname.match(/^\/api\/settings\/security\/passkeys\/[^/]+\/rename$/) && req.method === 'PATCH') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const passkeyId = pathname.split('/').slice(-2, -1)[0];
+      const { name } = JSON.parse(await readBody(req));
+      if (!name || name.length > 100) return sendJSON(res, 400, { error: 'Name required (max 100 chars)' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId, 'passkeys.id': passkeyId },
+        { $set: { 'passkeys.$.name': name, updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('passkey-renamed');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/passkeys/:id — remove a passkey */
+    if (pathname.match(/^\/api\/settings\/security\/passkeys\/[^/]+$/) && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      const passkeyId = pathname.split('/').pop();
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId }, { $pull: { passkeys: { id: passkeyId } }, $set: { updatedAt: new Date() } }
+      );
+      broadcastSecurityUpdate('passkey-deleted');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* ================================================================== */
+    /*  MOBILE DEVICE PAIRING                                              */
+    /* ================================================================== */
+
+    /* POST /api/settings/security/mobile/pair — generate pairing token + QR */
+    if (pathname === '/api/settings/security/mobile/pair' && req.method === 'POST') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      const pairToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+      await db.collection('security_settings').updateOne(
+        { userId },
+        { $set: { mobilePairToken: pairToken, mobilePairExpires: expiresAt, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      const pairUrl = `${WEBAUTHN_ORIGIN}/pair?token=${pairToken}`;
+      const qrDataUrl = await QRCode.toDataURL(pairUrl, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+      return sendJSON(res, 200, { pairUrl, qrDataUrl, expiresAt }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/mobile/confirm — confirm pairing from mobile */
+    if (pathname === '/api/settings/security/mobile/confirm' && req.method === 'POST') {
+      const { token, deviceName, os, browser } = JSON.parse(await readBody(req));
+      if (!token) return sendJSON(res, 400, { error: 'Token required' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ mobilePairToken: token });
+      if (!doc) return sendJSON(res, 400, { error: 'Invalid or expired pairing token' }, {}, requestOrigin);
+      if (doc.mobilePairExpires && new Date(doc.mobilePairExpires) < new Date()) {
+        return sendJSON(res, 400, { error: 'Pairing token expired. Generate a new one.' }, {}, requestOrigin);
+      }
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+      const mobileDevice = {
+        id: crypto.randomBytes(8).toString('hex'),
+        name: deviceName || 'Mobile Device',
+        browser: browser || 'Mobile Browser',
+        os: os || 'Unknown',
+        ip,
+        trusted: true,
+        mobile: true,
+        lastUsed: new Date(),
+        createdAt: new Date(),
+      };
+      await db.collection('security_settings').updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            mobilePairing: { deviceName: mobileDevice.name, os: mobileDevice.os, browser: mobileDevice.browser, linkedAt: new Date() },
+            updatedAt: new Date(),
+          },
+          $push: { trustedDevices: mobileDevice },
+          $unset: { mobilePairToken: '', mobilePairExpires: '' },
+        }
+      );
+      broadcastSecurityUpdate('mobile-paired');
+      return sendJSON(res, 200, { success: true, device: mobileDevice }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/mobile — unlink mobile */
+    if (pathname === '/api/settings/security/mobile' && req.method === 'DELETE') {
+      const userId = getUserIdFromAuth(req);
+      if (!userId) return sendJSON(res, 401, { error: 'Unauthorized' }, {}, requestOrigin);
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { userId },
+        {
+          $unset: { mobilePairing: '', mobilePairToken: '', mobilePairExpires: '' },
+          $pull: { trustedDevices: { mobile: true } },
+          $set: { updatedAt: new Date() },
+        }
+      );
+      broadcastSecurityUpdate('mobile-unlinked');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
     /* ---------- DEPLOY PM2 STATUS ---------- */
     if (pathname === '/api/deploy/pm2-status' && req.method === 'GET') {
       return sendJSON(res, 200, latestPm2Snapshot, {}, requestOrigin);
@@ -653,6 +1300,7 @@ const server = http.createServer(async (req, res) => {
     await seedWorkspaces();
     await ensureDb();
     await seedProjects();
+    await seedRecoveryEmails();
     // WebSocket server — handle upgrade only for /ws path
     const wss = new WebSocketServer({ noServer: true });
     server.on('upgrade', (request, socket, head) => {
@@ -681,6 +1329,10 @@ const server = http.createServer(async (req, res) => {
             ws.send(JSON.stringify({ type: 'history', name: msg.name, points: h }));
           } else if (msg.type === 'unsubscribe-proc') {
             ws._subProc = null;
+          } else if (msg.type === 'subscribe-security') {
+            ws._subSecurity = true;
+          } else if (msg.type === 'unsubscribe-security') {
+            ws._subSecurity = false;
           }
         } catch {}
       });

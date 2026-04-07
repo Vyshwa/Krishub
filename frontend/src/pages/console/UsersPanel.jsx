@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Plus, RefreshCw, Search, Pencil, Trash2, Ban, KeyRound, X } from 'lucide-react';
+import { Users, Plus, RefreshCw, Search, Pencil, Trash2, Ban, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const API = import.meta.env.VITE_API_URL || '';
@@ -21,35 +21,58 @@ const APP_COLORS = {
   RENOTE: 'bg-amber-600',
   REGEN: 'bg-blue-600',
   REVEAL: 'bg-purple-600',
+  REACT: 'bg-cyan-600',
+  RESIDE: 'bg-rose-600',
+  REQUEST: 'bg-orange-600',
   ALL: 'bg-green-600',
 };
 
-const APP_OPTIONS = ['KRISHUB', 'RENOTE', 'REGEN', 'REVEAL'];
+const ROLE_OPTIONS = ['USER', 'STAFF', 'OWNER', 'ADMIN'];
 
-function AddUserDialog({ open, onClose, onSuccess }) {
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', appCode: 'KRISHUB' });
+/* ---------- Slide-in Edit/Add Panel (like Workspace Apps) ---------- */
+function UserPanel({ user, isNew, apps, onClose, onSaved }) {
+  const [form, setForm] = useState(
+    isNew
+      ? { fullName: '', email: '', phone: '', password: '', appCode: apps[0]?.code || 'KRISHUB' }
+      : { fullName: user.name || '', email: user.email || '', phone: user.phone || '' }
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const handleSave = async () => {
     setError('');
     setSaving(true);
     try {
-      const body = { ...form };
-      if (!body.email) delete body.email;
-      if (!body.phone) delete body.phone;
-      const res = await fetch(`${API}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to create user');
-      onSuccess?.();
-      onClose();
-      setForm({ fullName: '', email: '', phone: '', password: '', appCode: 'KRISHUB' });
+      if (isNew) {
+        const body = { ...form };
+        if (!body.email) delete body.email;
+        if (!body.phone) delete body.phone;
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to create user');
+      } else {
+        const body = {};
+        if (form.fullName !== (user.name || '')) body.fullName = form.fullName;
+        if (form.email !== (user.email || '')) body.email = form.email;
+        if (form.phone !== (user.phone || '')) body.phone = form.phone;
+        if (Object.keys(body).length === 0) { onClose(); return; }
+        const res = await fetch(`${API}/api/users/${user.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to update user');
+      }
+      onSaved();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,44 +80,63 @@ function AddUserDialog({ open, onClose, onSuccess }) {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-popover border rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-background border-l shadow-2xl z-50 overflow-y-auto">
+      <div className="p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Add User</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
+          <div>
+            <h2 className="text-lg font-bold">{isNew ? 'Add User' : 'Edit User'}</h2>
+            <p className="text-sm text-muted-foreground">{isNew ? 'Create a new user account.' : `Update ${user.name}'s profile.`}</p>
+          </div>
+          <button onClick={onClose}><X className="h-5 w-5" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
+
+        <div>
+          <Label>Full Name *</Label>
+          <Input value={form.fullName} onChange={e => set('fullName', e.target.value)} placeholder="John Doe" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="au-name">Full Name *</Label>
-            <Input id="au-name" required minLength={3} value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} placeholder="John Doe" />
-          </div>
-          <div>
-            <Label htmlFor="au-email">Email</Label>
-            <Input id="au-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
-          </div>
-          <div>
-            <Label htmlFor="au-phone">Phone</Label>
-            <Input id="au-phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" />
+            <Label>Email</Label>
+            <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="user@example.com" />
           </div>
           <div>
-            <Label htmlFor="au-pass">Password *</Label>
-            <Input id="au-pass" type="password" required minLength={8} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" />
+            <Label>Phone</Label>
+            <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="9876543210" />
           </div>
-          <div>
-            <Label htmlFor="au-app">App *</Label>
-            <select id="au-app" className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm" value={form.appCode} onChange={e => setForm(f => ({ ...f, appCode: e.target.value }))}>
-              {APP_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+        </div>
+
+        {isNew && (
+          <>
+            <div>
+              <Label>Password *</Label>
+              <Input type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Min 8 characters" />
+            </div>
+            <div>
+              <Label>App *</Label>
+              <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.appCode} onChange={e => set('appCode', e.target.value)}>
+                {apps.map(a => (
+                  <option key={a.code} value={a.code}>
+                    {a.icon} {a.name} ({a.code}){a.status !== 'active' ? ' — Coming Soon' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
+        {!isNew && (
+          <div className="pt-2 border-t space-y-2">
+            <p className="text-xs text-muted-foreground">Current: <span className={`inline-block text-xs px-2 py-0.5 rounded font-bold text-white ${APP_COLORS[user.app] || 'bg-gray-600'}`}>{user.app}</span> · <span className={`inline-block text-xs px-2 py-0.5 rounded-md font-medium ${ROLE_COLORS[user.role] || 'bg-muted'}`}>{user.role}</span></p>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button type="submit" size="sm" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</Button>
-          </div>
-        </form>
+        )}
+
+        {error && <p className="text-sm text-destructive bg-destructive/10 rounded p-2">{error}</p>}
+
+        <Button className="w-full" disabled={saving || !form.fullName || (isNew && !form.password)} onClick={handleSave}>
+          {saving ? 'Saving...' : isNew ? 'Create User' : 'Update User'}
+        </Button>
       </div>
     </div>
   );
@@ -103,10 +145,13 @@ function AddUserDialog({ open, onClose, onSuccess }) {
 export function UsersPanel() {
   const { accessToken, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
+  const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('All');
-  const [showAddUser, setShowAddUser] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [isAddNew, setIsAddNew] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     if (!accessToken) return;
@@ -124,9 +169,45 @@ export function UsersPanel() {
     setLoading(false);
   }, [accessToken]);
 
+  const fetchApps = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/workspaces`);
+      if (res.ok) {
+        const data = await res.json();
+        setApps(data.map(a => ({ code: a.code, name: a.name, icon: a.icon || '📦', status: a.status })));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (!authLoading && accessToken) fetchUsers();
-  }, [authLoading, accessToken, fetchUsers]);
+    fetchApps();
+  }, [authLoading, accessToken, fetchUsers, fetchApps]);
+
+  const toggleBlock = async (user) => {
+    const action = user.status === 'Blocked' ? 'unblock' : 'block';
+    if (!confirm(`${action === 'block' ? 'Block' : 'Unblock'} ${user.name}?`)) return;
+    setActionLoading(user.id);
+    try {
+      const res = await fetch(`${API}/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isBlocked: action === 'block' }),
+      });
+      if (res.ok) fetchUsers();
+    } catch {}
+    setActionLoading(null);
+  };
+
+  const deleteUser = async (user) => {
+    if (!confirm(`Delete ${user.name}? This cannot be undone.`)) return;
+    setActionLoading(user.id);
+    try {
+      await fetch(`${API}/api/users/${user.id}`, { method: 'DELETE' });
+      fetchUsers();
+    } catch {}
+    setActionLoading(null);
+  };
 
   // Get unique app codes for tabs
   const appCounts = {};
@@ -153,7 +234,7 @@ export function UsersPanel() {
           <Button size="sm" variant="outline" onClick={fetchUsers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Button size="sm" onClick={() => setShowAddUser(true)}>
+          <Button size="sm" onClick={() => { setIsAddNew(true); setEditUser({}); }}>
             <Plus className="h-4 w-4 mr-1" /> Add User
           </Button>
           <div className="relative">
@@ -162,8 +243,6 @@ export function UsersPanel() {
           </div>
         </div>
       </div>
-
-      <AddUserDialog open={showAddUser} onClose={() => setShowAddUser(false)} onSuccess={fetchUsers} />
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
@@ -213,15 +292,28 @@ export function UsersPanel() {
                     {u.role || '—'}
                   </span>
                 </td>
-                <td className="p-3 text-muted-foreground">{u.status}</td>
+                <td className="p-3">
+                  <span className={`text-xs font-medium ${u.status === 'Blocked' ? 'text-red-400' : 'text-muted-foreground'}`}>{u.status}</span>
+                </td>
                 <td className="p-3 text-right">
                   {u.role === 'PARAM' ? (
                     <span className="text-xs text-muted-foreground italic">Super Admin</span>
                   ) : (
                     <div className="flex items-center justify-end gap-1">
-                      <button className="p-1.5 rounded hover:bg-muted" title="Edit"><Pencil className="h-4 w-4" /></button>
-                      <button className="p-1.5 rounded hover:bg-muted" title="Reset Password"><KeyRound className="h-4 w-4" /></button>
-                      <button className="p-1.5 rounded hover:bg-muted text-destructive" title="Block User"><Ban className="h-4 w-4" /></button>
+                      <button className="p-1.5 rounded hover:bg-muted" title="Edit" onClick={() => { setEditUser(u); setIsAddNew(false); }}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        className={`p-1.5 rounded hover:bg-muted ${u.status === 'Blocked' ? 'text-emerald-400' : 'text-destructive'}`}
+                        title={u.status === 'Blocked' ? 'Unblock User' : 'Block User'}
+                        disabled={actionLoading === u.id}
+                        onClick={() => toggleBlock(u)}
+                      >
+                        {u.status === 'Blocked' ? <ShieldCheck className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                      </button>
+                      <button className="p-1.5 rounded hover:bg-muted text-destructive" title="Delete User" disabled={actionLoading === u.id} onClick={() => deleteUser(u)}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   )}
                 </td>
@@ -233,6 +325,17 @@ export function UsersPanel() {
           </tbody>
         </table>
       </div>
+
+      {/* Slide-in Panel */}
+      {editUser && (
+        <UserPanel
+          user={editUser}
+          isNew={isAddNew}
+          apps={apps}
+          onClose={() => { setEditUser(null); setIsAddNew(false); }}
+          onSaved={() => { setEditUser(null); setIsAddNew(false); fetchUsers(); }}
+        />
+      )}
     </div>
   );
 }
