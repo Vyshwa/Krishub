@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import revealImg from '@/assets/Reveal.jpeg';
-import renoteImg from '@/assets/renote.png';
-import regenImg from '@/assets/regen.jpeg';
-import resideLogo from '@/assets/Reside logo.jpg';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+
+const revealImg = '/assets/Reveal.jpeg';
+const renoteImg = '/assets/renote.png';
+const regenImg = '/assets/regen.jpeg';
+const resideLogo = '/assets/Reside logo.jpg';
 
 const groups = [
   {
@@ -66,7 +67,7 @@ function AppIcon({ app, onClose, ssoToken }) {
     );
   }
   return (
-    <Link key={app.name} to={app.href} className={cls} onClick={onClose}>
+    <Link key={app.name} href={app.href} className={cls} onClick={onClose}>
       {inner}
     </Link>
   );
@@ -76,7 +77,15 @@ export function AppLauncher() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const { isAuthenticated } = useAuth();
-  const ssoToken = isAuthenticated ? localStorage.getItem('krishub_sso') : null;
+  const [ssoToken, setSsoToken] = useState(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setSsoToken(localStorage.getItem('krishub_sso'));
+    } else {
+      setSsoToken(null);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     function onDocClick(e) {

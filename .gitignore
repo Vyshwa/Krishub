@@ -16,6 +16,8 @@ build/
 out/
 .turbo/
 .cache/
+.swc/
+*.tsbuildinfo
 
 # Uploads & user-generated content
 uploads/
@@ -44,3 +46,6 @@ Thumbs.db
 
 # Misc
 frontend/public/assets/*.exe
+
+# Vite (legacy)
+*.local

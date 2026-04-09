@@ -6,7 +6,7 @@ const EditorStates = {
   ElementSelection: { type: 'element-selection', selectedElements: null },
 };
 
-const allowedOrigins = ['http://localhost:3000', 'https://dev.caffeine.ai', 'https://caffeine.ai'];
+const allowedOrigins = ['https://dev.caffeine.ai', 'https://caffeine.ai'];
 let parentOrigin = null;
 
 function hashDomTreeString(input) {

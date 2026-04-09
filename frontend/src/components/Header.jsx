@@ -1,6 +1,9 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useRouterState, useNavigate } from '@tanstack/react-router';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { Menu, ExternalLink, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -10,11 +13,11 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { data: user } = useCurrentUser();
   const logout = useLogout();
-  const navigate = useNavigate();
-  const routerState = useRouterState();
-  const currentPath = routerState.location.pathname;
+  const router = useRouter();
+  const currentPath = usePathname();
 
   const navLinks = [
     { path: '/', label: 'Home' },
@@ -48,11 +51,13 @@ export function Header() {
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
+  useEffect(() => setMounted(true), []);
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container px-2 md:px-8 flex h-16 items-center justify-between">
         <div className="flex items-center">
-          <Link to="/" className="flex items-end h-8 md:h-12">
+          <Link href="/" className="flex items-end h-8 md:h-12">
             <Logo className="h-10 md:h-16" />
             <span className="text-lg md:text-2xl font-bold tracking-tight text-primary leading-none -ml-2 md:-ml-3 mb-1 md:mb-2">Krishub</span>
           </Link>
@@ -61,7 +66,7 @@ export function Header() {
         {!isAppRoute && (
           <nav className="hidden md:flex items-center space-x-1">
             {navLinks.map((link) => (
-              <Link key={link.path} to={link.path}>
+              <Link key={link.path} href={link.path}>
                 <Button variant={isActive(link.path) ? 'default' : 'ghost'} className="font-medium">
                   {link.label}
                 </Button>
@@ -111,7 +116,7 @@ export function Header() {
               </button>
 
               {/* Full-screen mobile menu */}
-              {createPortal(
+              {mounted && createPortal(
               <div
                 className={`fixed left-0 right-0 bottom-0 top-16 z-[100] ${isOpen ? 'visible' : 'invisible pointer-events-none'}`}
               >
@@ -122,7 +127,7 @@ export function Header() {
                   onClick={() => setIsOpen(false)}
                 />
 
-                {/* Animated mesh gradient background */}
+                {/* Subtle gradient accent */}
                 <div
                   className="absolute inset-0 overflow-hidden transition-opacity duration-700 pointer-events-none"
                   style={{ opacity: isOpen ? 1 : 0 }}
@@ -144,7 +149,7 @@ export function Header() {
                     {navLinks.map((link, i) => (
                       <Link
                         key={link.path}
-                        to={link.path}
+                        href={link.path}
                         onClick={() => setIsOpen(false)}
                         className="w-full"
                       >
@@ -177,7 +182,7 @@ export function Header() {
                         transition: `opacity 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + navLinks.length * 0.07}s, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + navLinks.length * 0.07}s`,
                       }}
                     >
-                      <Link to="/?view=marketing" onClick={() => setIsOpen(false)}>
+                      <Link href="/?view=marketing" onClick={() => setIsOpen(false)}>
                         <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-primary">
                           <ExternalLink size={16} /> Website
                         </Button>
@@ -189,7 +194,7 @@ export function Header() {
                           className="gap-1.5 text-destructive hover:bg-destructive/10"
                           onClick={() => {
                             setIsOpen(false);
-                            logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) });
+                            logout.mutate(undefined, { onSuccess: () => router.push('/') });
                           }}
                         >
                           <LogOut size={16} className="rotate-180" /> Sign Out
@@ -212,7 +217,7 @@ export function Header() {
 function AuthActions() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   if (user) {
     return (
@@ -220,7 +225,7 @@ function AuthActions() {
         <span className="text-sm font-semibold text-muted-foreground hidden lg:inline-block">
           {user.fullName || user.name || 'User'}
         </span>
-        <Link to="/apps">
+        <Link href="/apps">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Settings className="h-4 w-4" />
           </Button>
@@ -229,7 +234,7 @@ function AuthActions() {
           variant="ghost"
           size="sm"
           className="text-destructive hover:bg-destructive/10 gap-1.5"
-          onClick={() => logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) })}
+          onClick={() => logout.mutate(undefined, { onSuccess: () => router.push('/') })}
         >
           <LogOut className="h-4 w-4 rotate-180" />
           <span className="hidden lg:inline">Sign Out</span>
@@ -239,10 +244,10 @@ function AuthActions() {
   }
   return (
     <div className="hidden md:flex items-center gap-2">
-      <Link to="/login">
+      <Link href="/login">
         <Button variant="outline">Login</Button>
       </Link>
-      <Link to="/register">
+      <Link href="/register">
         <Button>Register</Button>
       </Link>
     </div>
@@ -256,7 +261,7 @@ function MobileLoginButton() {
     return <span className="text-xs font-semibold text-muted-foreground truncate max-w-[80px]">{firstName}</span>;
   }
   return (
-    <Link to="/login">
+    <Link href="/login">
       <Button size="sm" variant="outline">Login</Button>
     </Link>
   );
@@ -265,7 +270,7 @@ function MobileLoginButton() {
 function MobileConsoleActions() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [consoleNavOpen, setConsoleNavOpen] = useState(false);
 
   useEffect(() => {
@@ -279,7 +284,7 @@ function MobileConsoleActions() {
   return (
     <div className="flex items-center gap-1">
       <span className="text-xs font-semibold text-muted-foreground truncate max-w-[80px]">{firstName}</span>
-      <Link to="/apps">
+      <Link href="/apps">
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Settings className="h-4 w-4" />
         </Button>
@@ -288,7 +293,7 @@ function MobileConsoleActions() {
         variant="ghost"
         size="icon"
         className="h-8 w-8 text-destructive hover:bg-destructive/10"
-        onClick={() => logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) })}
+        onClick={() => logout.mutate(undefined, { onSuccess: () => router.push('/') })}
       >
         <LogOut className="h-4 w-4 rotate-180" />
       </Button>

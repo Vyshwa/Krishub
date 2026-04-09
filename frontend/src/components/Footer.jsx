@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -16,12 +17,12 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="/" className="hover:text-primary transition-colors">Home</a></li>
-              <li><a href="/software" className="hover:text-primary transition-colors">Software Solutions</a></li>
-              <li><a href="/hardware" className="hover:text-primary transition-colors">Hardware Services</a></li>
-              <li><a href="/hiring" className="hover:text-primary transition-colors">Hiring</a></li>
-              <li><a href="/amc" className="hover:text-primary transition-colors">AMC Warranty</a></li>
-              <li><a href="/rent" className="hover:text-primary transition-colors">Rent PC</a></li>
+              <li><Link href="/" className="hover:text-primary transition-colors">Home</Link></li>
+              <li><Link href="/software" className="hover:text-primary transition-colors">Software Solutions</Link></li>
+              <li><Link href="/hardware" className="hover:text-primary transition-colors">Hardware Services</Link></li>
+              <li><Link href="/hiring" className="hover:text-primary transition-colors">Hiring</Link></li>
+              <li><Link href="/amc" className="hover:text-primary transition-colors">AMC Warranty</Link></li>
+              <li><Link href="/rent" className="hover:text-primary transition-colors">Rent PC</Link></li>
             </ul>
           </div>
 
@@ -54,9 +55,9 @@ export function Footer() {
             Made with <span className="inline-block animate-heartbeat text-red-500 drop-shadow-[0_0_6px_rgba(239,68,68,0.7)]">❤️</span> by KrisHub
           </p>
           <div className="flex items-center gap-4">
-            <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
-            <a href="/refund" className="hover:text-primary transition-colors">Refund Policy</a>
+            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+            <Link href="/refund" className="hover:text-primary transition-colors">Refund Policy</Link>
           </div>
         </div>
       </div>

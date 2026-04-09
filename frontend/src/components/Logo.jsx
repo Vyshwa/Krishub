@@ -1,4 +1,4 @@
-import logoPngUrl from '@/assets/LogoMark.png';
+const logoPngUrl = '/assets/LogoMark.png';
 
 const sizeClass = {
   sm: 'h-8',

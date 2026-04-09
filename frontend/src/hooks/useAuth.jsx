@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-const API = import.meta.env.VITE_API_URL || '';
+const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 const AuthContext = createContext(null);
 

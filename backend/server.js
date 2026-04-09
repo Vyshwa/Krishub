@@ -1384,14 +1384,14 @@ const server = http.createServer(async (req, res) => {
       const project = await db.collection('projects').findOne({ _id: new ObjectId(projectId) });
       if (!project) return sendJSON(res, 404, { error: 'Project not found' }, {}, requestOrigin);
 
-      const targetPath = project[target === 'frontend' ? 'frontendPath' : 'backendPath'];
+      const targetPath = target === 'project' ? (project.frontendPath || project.backendPath) : project[target === 'frontend' ? 'frontendPath' : 'backendPath'];
       // Resolve service config from DB fields (pm2*Name / systemd*Name)
-      const pm2Name = project[target === 'frontend' ? 'pm2FrontendName' : 'pm2BackendName'];
-      const systemdName = project[target === 'frontend' ? 'systemdFrontendName' : 'systemdBackendName'];
+      const pm2Name = target !== 'project' ? project[target === 'frontend' ? 'pm2FrontendName' : 'pm2BackendName'] : null;
+      const systemdName = target !== 'project' ? project[target === 'frontend' ? 'systemdFrontendName' : 'systemdBackendName'] : null;
       const service = pm2Name ? { type: 'pm2', name: pm2Name }
                     : systemdName ? { type: 'systemd', name: systemdName }
                     : null;
-      if (!targetPath) return sendJSON(res, 400, { error: `No ${target} path configured` }, {}, requestOrigin);
+      if (!targetPath && target !== 'project') return sendJSON(res, 400, { error: `No ${target} path configured` }, {}, requestOrigin);
 
       const logEntry = {
         projectId: project._id.toString(),
@@ -1446,6 +1446,85 @@ const server = http.createServer(async (req, res) => {
           } else {
             logEntry.output = await safeExec('sudo nginx -t && sudo systemctl reload nginx', targetPath);
           }
+        } else if (action === 'test') {
+          /* ---- Security Test Suite ---- */
+          const port = project[target === 'frontend' ? 'frontendPort' : 'backendPort'];
+          const domain = project.domain || 'localhost';
+          const baseUrl = port ? `http://localhost:${port}` : `https://${domain}`;
+          const parts = [];
+
+          // 1. npm audit (dependency / supply-chain risks)
+          try { parts.push('=== NPM AUDIT ===\n' + await safeExec('npm audit --production --audit-level=moderate 2>&1 || true', targetPath)); } catch (e) { parts.push('npm audit: ' + e.message); }
+
+          // 2. Outdated packages check
+          try { parts.push('=== OUTDATED PACKAGES ===\n' + await safeExec('npm outdated --long 2>&1 || true', targetPath)); } catch (e) { parts.push('outdated: ' + e.message); }
+
+          // 3. HTTP security headers scan
+          try { parts.push('=== SECURITY HEADERS ===\n' + await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(strict-transport|x-content-type|x-frame|x-xss|content-security|referrer-policy|permissions-policy|cross-origin|x-permitted|server:)' || echo 'No security headers found'`, targetPath)); } catch (e) { parts.push('headers: ' + e.message); }
+
+          // 4. SSL/TLS check (if domain configured)
+          if (project.domain) {
+            try { parts.push('=== SSL/TLS CHECK ===\n' + await safeExec(`echo | openssl s_client -connect ${project.domain}:443 -servername ${project.domain} 2>/dev/null | openssl x509 -noout -dates -subject -issuer 2>&1 || echo 'SSL check failed'`, targetPath)); } catch (e) { parts.push('ssl: ' + e.message); }
+          }
+
+          // 5. Open ports scan on project ports
+          if (port) {
+            try { parts.push('=== PORT CHECK ===\n' + await safeExec(`ss -tlnp 2>/dev/null | grep ':${port} ' || echo 'Port ${port} not listening'`, targetPath)); } catch (e) { parts.push('port: ' + e.message); }
+          }
+
+          // 6. Sensitive file exposure check
+          const sensitiveFiles = ['.env', '.git/config', 'package.json', '.env.local', 'server.js'];
+          const exposureResults = [];
+          for (const f of sensitiveFiles) {
+            try {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/${f}" 2>&1`, targetPath);
+              if (code === '200') exposureResults.push(`EXPOSED: ${f} (200 OK)`);
+            } catch {}
+          }
+          parts.push('=== SENSITIVE FILE EXPOSURE ===\n' + (exposureResults.length ? exposureResults.join('\n') : 'No sensitive files exposed'));
+
+          // 7. CORS misconfiguration check
+          try { parts.push('=== CORS CHECK ===\n' + await safeExec(`curl -sI -H "Origin: https://evil.com" "${baseUrl}/" 2>&1 | grep -i 'access-control' || echo 'No CORS headers for foreign origin (good)'`, targetPath)); } catch (e) { parts.push('cors: ' + e.message); }
+
+          // 8. Rate limiting check (attempt rapid requests)
+          if (target === 'backend') {
+            try { parts.push('=== RATE LIMIT CHECK ===\n' + await safeExec(`for i in $(seq 1 20); do curl -s -o /dev/null -w "%{http_code} " "${baseUrl}/api/auth/login" -X POST -H "Content-Type: application/json" -d '{}' 2>&1; done; echo`, targetPath)); } catch (e) { parts.push('rate-limit: ' + e.message); }
+          }
+
+          // 9. Directory listing check
+          try { parts.push('=== DIRECTORY LISTING ===\n' + await safeExec(`curl -s "${baseUrl}/" 2>&1 | grep -i 'index of /' && echo 'WARN: Directory listing enabled' || echo 'Directory listing disabled (good)'`, targetPath)); } catch (e) { parts.push('dirlist: ' + e.message); }
+
+          // 10. Basic injection probes (XSS, SQLi markers in response)
+          try {
+            const xssPayload = encodeURIComponent('<script>alert(1)</script>');
+            const xssResult = await safeExec(`curl -s "${baseUrl}/?q=${xssPayload}" 2>&1 | grep -c '<script>alert(1)</script>' || true`, targetPath);
+            parts.push('=== XSS REFLECTION CHECK ===\n' + (parseInt(xssResult) > 0 ? 'WARN: XSS payload reflected in response' : 'No XSS reflection detected (good)'));
+          } catch (e) { parts.push('xss: ' + e.message); }
+
+          // 11. Git exposure check
+          try { parts.push('=== GIT EXPOSURE ===\n' + await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/.git/HEAD" 2>&1 | grep -q 200 && echo 'CRITICAL: .git directory exposed!' || echo '.git not exposed (good)'`, targetPath)); } catch (e) { parts.push('git-exposure: ' + e.message); }
+
+          // 12. Cookie security check
+          try { parts.push('=== COOKIE SECURITY ===\n' + await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'set-cookie' | grep -v -i 'secure\\|httponly\\|samesite' && echo 'WARN: Cookies missing security flags' || echo 'Cookie flags OK or no cookies set'`, targetPath)); } catch (e) { parts.push('cookies: ' + e.message); }
+
+          // 13. Server info leakage
+          try { parts.push('=== SERVER INFO LEAKAGE ===\n' + await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(server:|x-powered-by:)' || echo 'No server info leaked (good)'`, targetPath)); } catch (e) { parts.push('server-info: ' + e.message); }
+
+          logEntry.output = parts.join('\n\n');
+
+        } else if (action === 'ssl-renew') {
+          /* ---- SSL Certificate Renewal ---- */
+          const domain = project.domain;
+          if (!domain) throw new Error('No domain configured for this project');
+          logEntry.output = await safeExec(`sudo certbot renew --cert-name ${domain} --force-renewal --non-interactive 2>&1 && sudo systemctl reload nginx`, targetPath || '/tmp');
+
+        } else if (action === 'ssl-new') {
+          /* ---- SSL Certificate New Generation ---- */
+          const domain = project.domain;
+          if (!domain) throw new Error('No domain configured for this project');
+          const wwwDomain = `www.${domain}`;
+          logEntry.output = await safeExec(`sudo certbot certonly --nginx -d ${domain} -d ${wwwDomain} --non-interactive --agree-tos --email admin@${domain} 2>&1 && sudo systemctl reload nginx`, targetPath || '/tmp');
+
         } else {
           throw new Error(`Unknown action: ${action}`);
         }

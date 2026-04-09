@@ -4,7 +4,7 @@ export function useSubmitContactForm() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ name, email, message }) => {
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const base = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${base}/api/contact-forms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -25,7 +25,7 @@ export function useGetAllContactForms() {
   return useQuery({
     queryKey: ['contactForms'],
     queryFn: async () => {
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const base = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${base}/api/contact-forms`);
       if (!res.ok) return [];
       return await res.json();
@@ -37,7 +37,7 @@ export function useGetAllContactForms() {
 export function useSubmitAmcEnquiry() {
   return useMutation({
     mutationFn: async ({ name, email, phone, plan, systems, message }) => {
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const base = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${base}/api/amc-enquiries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ export function useSubmitAmcEnquiry() {
 export function useSubmitHiringApplication() {
   return useMutation({
     mutationFn: async ({ name, email, phone, position, experience, message }) => {
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const base = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${base}/api/hiring-applications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,7 +71,7 @@ export function useSubmitHiringApplication() {
 export function useSubmitRentalEnquiry() {
   return useMutation({
     mutationFn: async ({ name, email, phone, category, quantity, duration, message }) => {
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const base = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${base}/api/rental-enquiries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

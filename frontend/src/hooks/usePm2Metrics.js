@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
-const API = import.meta.env.VITE_API_URL || '';
+const WS_URL = typeof window !== 'undefined'
+  ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+  : '';
+const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 export function usePm2Metrics() {
   const [pm2Procs, setPm2Procs] = useState([]);
