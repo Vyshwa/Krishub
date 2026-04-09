@@ -104,20 +104,21 @@ export function DeployDashboard() {
                         proj[target === 'frontend' ? 'pm2FrontendName' : 'pm2BackendName'] ||
                         proj[target === 'frontend' ? 'systemdFrontendName' : 'systemdBackendName']
                       );
-                      const serviceActions = ['restart', 'stop', 'start'];
+                      const isStatic = !hasService;
+                      const serviceActions = [];
                       return (
                         <div key={target} className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase">{target}{!hasService && ' (static)'}</p>
+                          <p className="text-xs font-medium text-muted-foreground uppercase">{target}{isStatic && ' (static)'}</p>
                           <div className="flex flex-wrap gap-2">
                             {[
                               { action: 'git-pull', label: 'Git Pull', Icon: GitBranch },
                               { action: 'install', label: 'Install', Icon: Download },
                               { action: 'build', label: 'Build', Icon: Hammer },
                               { action: 'full-deploy', label: 'Full Deploy', Icon: Zap, variant: 'default' },
-                              { action: 'restart', label: 'Restart', Icon: RotateCcw },
-                              { action: 'stop', label: 'Stop', Icon: Square },
-                              { action: 'start', label: 'Start', Icon: Play },
-                            ].filter(({ action }) => hasService || !serviceActions.includes(action))
+                              { action: 'restart', label: isStatic ? 'Reload Nginx' : 'Restart', Icon: RotateCcw },
+                              { action: 'stop', label: 'Stop', Icon: Square, hidden: isStatic },
+                              { action: 'start', label: isStatic ? 'Reload Nginx' : 'Start', Icon: Play },
+                            ].filter(({ action, hidden }) => !hidden && (hasService || !serviceActions.includes(action)))
                             .map(({ action, label, Icon, variant }) => {
                               const key = `${id}-${action}-${target}`;
                               return (

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useSearch } from '@tanstack/react-router';
-import { Smartphone, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useSearch, useNavigate } from '@tanstack/react-router';
+import { Smartphone, CheckCircle, XCircle, Loader2, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const API = import.meta.env.VITE_API_URL || '';
 
 export function Pair() {
   const { token } = useSearch({ strict: false });
+  const navigate = useNavigate();
   const [status, setStatus] = useState('loading'); // loading | success | error
   const [message, setMessage] = useState('');
 
@@ -38,8 +39,12 @@ export function Pair() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Pairing failed');
+      // Store the mobile access token for alerts
+      if (data.mobileAccessToken) {
+        localStorage.setItem('krishub_mobile_token', data.mobileAccessToken);
+      }
       setStatus('success');
-      setMessage('Device paired successfully! You can close this page.');
+      setMessage('Device paired successfully! You will now receive alerts for untrusted device logins.');
     } catch (e) {
       setStatus('error');
       setMessage(e.message || 'Something went wrong. Please try again.');
@@ -72,6 +77,12 @@ export function Pair() {
           <Smartphone className="h-4 w-4" />
           <span>KrishHub Mobile Pairing</span>
         </div>
+
+        {status === 'success' && (
+          <Button onClick={() => navigate({ to: '/alerts' })} className="gap-2">
+            <Bell className="h-4 w-4" /> Open Device Alerts
+          </Button>
+        )}
 
         {status === 'error' && (
           <Button variant="outline" onClick={confirmPairing}>

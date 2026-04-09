@@ -36,8 +36,8 @@ export function Footer() {
               <li className="flex items-start gap-2">
                 <Phone className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <div className="flex flex-col">
-                  <span>9092024444</span>
-                  <span>9789719897</span>
+                  <span>+91 909 202 4443</span>
+                  <span>+91 909 202 4444</span>
                 </div>
               </li>
               <li className="flex items-start gap-2">
@@ -52,7 +52,7 @@ export function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p className="flex items-center gap-1">
-            Made with ❤️ by KrisHub
+            Made with <span className="inline-block animate-heartbeat text-red-500 drop-shadow-[0_0_6px_rgba(239,68,68,0.7)]">❤️</span> by KrisHub
           </p>
           <div className="flex items-center gap-4">
             <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>

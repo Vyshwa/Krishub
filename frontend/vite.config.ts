@@ -8,6 +8,9 @@ export default defineConfig({
   },
   preview: {
     allowedHosts: ['krishub.in', 'www.krishub.in'],
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
   },
   plugins: [react()],
   resolve: {

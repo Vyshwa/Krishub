@@ -13,22 +13,29 @@ import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { Refund } from './pages/Refund';
 import { Pair } from './pages/Pair';
+import { MobileAlerts } from './pages/MobileAlerts';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
+import { ParticleBackground } from './components/ParticleBackground';
+import { PageTransition } from './components/PageTransition';
 
 import { useRouterState } from '@tanstack/react-router';
 
 function Layout() {
   const routerState = useRouterState();
   const isAppRoute = routerState.location.pathname === '/apps';
+  const isAlertsRoute = routerState.location.pathname === '/alerts';
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col relative">
+      <ParticleBackground />
       <Header />
-      <main className="flex-1">
-        <Outlet />
+      <main className="flex-1 relative z-10">
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
-      {!isAppRoute && <Footer />}
+      {!isAppRoute && !isAlertsRoute && <Footer />}
     </div>
   );
 }
@@ -126,6 +133,11 @@ const pairRoute = createRoute({
   }),
   component: Pair,
 });
+const alertsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/alerts',
+  component: MobileAlerts,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -142,6 +154,7 @@ const routeTree = rootRoute.addChildren([
   termsRoute,
   refundRoute,
   pairRoute,
+  alertsRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useCurrentUser, useLogout, useAuth } from '@/hooks/useAuth';
 import { LayoutDashboard, ExternalLink, Home, Settings, LogOut, Search, Bell, Globe, Users, Rocket, Menu, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Logo } from '@/components/Logo';
 import { WorkspaceApps } from './console/WorkspaceApps';
 import { UsersPanel } from './console/UsersPanel';
@@ -23,6 +23,20 @@ export function Apps() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [mobileNav, setMobileNav] = useState(false);
   const { pm2Procs, pm2Sparklines, healthChecks, wsRef } = usePm2Metrics();
+
+  useEffect(() => {
+    const handler = () => setMobileNav(prev => {
+      const next = !prev;
+      window.dispatchEvent(new CustomEvent('console-nav-state', { detail: next }));
+      return next;
+    });
+    window.addEventListener('toggle-console-nav', handler);
+    return () => window.removeEventListener('toggle-console-nav', handler);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('console-nav-state', { detail: mobileNav }));
+  }, [mobileNav]);
 
   if (isLoading) {
     return (
@@ -76,8 +90,6 @@ export function Apps() {
     { id: 'workspace', label: 'Workspace', icon: Globe },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'deploy', label: 'Deploy', icon: Rocket },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const appList = [
@@ -96,65 +108,83 @@ export function Apps() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-background flex">
-      {/* Mobile console nav trigger */}
-      <div className="lg:hidden fixed top-[10px] right-3 z-[60]">
-        <Sheet open={mobileNav} onOpenChange={setMobileNav}>
-          <SheetTrigger asChild>
-            <button
-              className="relative h-10 w-10 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
-              aria-label="Console menu"
-            >
-              <span className={`absolute transition-all duration-300 ${mobileNav ? 'rotate-90 opacity-0 scale-75' : 'rotate-0 opacity-100 scale-100'}`}><Menu size={22} /></span>
-              <span className={`absolute transition-all duration-300 ${mobileNav ? 'rotate-0 opacity-100 scale-100' : '-rotate-90 opacity-0 scale-75'}`}><X size={22} /></span>
-            </button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
-            <SheetHeader className="p-4 pb-2 border-b">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
-                  <LayoutDashboard size={18} />
-                </div>
-                <SheetTitle className="text-lg font-bold tracking-tight">Console</SheetTitle>
-              </div>
-            </SheetHeader>
-            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-              {sidebarItems.map(item => (
-                <Button
+      {/* Mobile console nav (triggered from Header) */}
+      {createPortal(
+        <div className={`fixed left-0 right-0 bottom-0 top-16 z-[100] lg:hidden ${mobileNav ? 'visible' : 'invisible pointer-events-none'}`}>
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-background/95 backdrop-blur-2xl transition-opacity duration-400"
+            style={{ opacity: mobileNav ? 1 : 0 }}
+            onClick={() => setMobileNav(false)}
+          />
+          {/* Gradient orbs */}
+          <div className="absolute inset-0 overflow-hidden transition-opacity duration-700 pointer-events-none" style={{ opacity: mobileNav ? 1 : 0 }}>
+            <div className="absolute top-[10%] left-[15%] w-72 h-72 rounded-full bg-primary/20 dark:bg-primary/30 blur-[100px] animate-float" />
+            <div className="absolute bottom-[20%] right-[10%] w-96 h-96 rounded-full bg-primary/10 dark:bg-primary/20 blur-[120px] animate-float-delayed" />
+            <div className="absolute top-[50%] left-[50%] w-64 h-64 rounded-full bg-primary/15 dark:bg-primary/25 blur-[80px] animate-float-slow" />
+          </div>
+          {/* Centered card */}
+          <div className="relative z-10 flex items-center justify-center h-full px-6">
+            <nav className="w-full max-w-sm flex flex-col items-center gap-3 bg-card/80 dark:bg-card/70 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-2xl shadow-black/10 dark:shadow-black/30">
+              {sidebarItems.map((item, i) => (
+                <button
                   key={item.id}
-                  variant={activeSection === item.id ? 'secondary' : 'ghost'}
-                  className={`w-full justify-start gap-3 h-11 px-3 text-sm ${activeSection !== item.id ? 'text-muted-foreground hover:text-foreground' : ''}`}
                   onClick={() => { setActiveSection(item.id); setMobileNav(false); }}
+                  className="w-full"
                 >
-                  <item.icon size={18} /> {item.label}
-                </Button>
+                  <div
+                    className={`
+                      w-full text-center py-3.5 px-6 rounded-xl text-xl font-semibold
+                      transition-all duration-300 flex items-center justify-center gap-3
+                      ${activeSection === item.id
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
+                        : 'text-foreground hover:bg-primary/15 hover:text-primary'
+                      }
+                    `}
+                    style={{
+                      opacity: mobileNav ? 1 : 0,
+                      transform: mobileNav ? 'translateY(0) scale(1)' : 'translateY(30px) scale(0.9)',
+                      transition: `opacity 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + i * 0.07}s, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + i * 0.07}s`,
+                    }}
+                  >
+                    <item.icon size={20} /> {item.label}
+                  </div>
+                </button>
               ))}
-
-              <div className="pt-3 mt-3 border-t">
-                <Link to="/?view=marketing" onClick={() => setMobileNav(false)}>
-                  <Button variant="ghost" className="w-full justify-start gap-3 h-11 px-3 text-sm text-muted-foreground hover:text-primary">
-                    <ExternalLink size={18} /> Main Website
-                  </Button>
-                </Link>
-              </div>
-            </nav>
-            <div className="p-4 pt-2 border-t">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-11 px-3 text-sm text-destructive hover:bg-destructive/10"
-                onClick={() => {
-                  setMobileNav(false);
-                  logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) });
+              {/* Bottom actions */}
+              <div
+                className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50 w-full justify-center"
+                style={{
+                  opacity: mobileNav ? 1 : 0,
+                  transform: mobileNav ? 'translateY(0)' : 'translateY(20px)',
+                  transition: `opacity 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + sidebarItems.length * 0.07}s, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${0.15 + sidebarItems.length * 0.07}s`,
                 }}
               >
-                <LogOut size={18} className="rotate-180" /> Sign Out
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+                <Link to="/?view=marketing" onClick={() => setMobileNav(false)}>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-primary">
+                    <ExternalLink size={16} /> Website
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setMobileNav(false);
+                    logout.mutate(undefined, { onSuccess: () => navigate({ to: '/' }) });
+                  }}
+                >
+                  <LogOut size={16} className="rotate-180" /> Sign Out
+                </Button>
+              </div>
+            </nav>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-56 flex-col border-r bg-card p-4 justify-between shrink-0">
+      <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 bg-card/80 dark:bg-card/70 backdrop-blur-xl p-4 justify-between shrink-0 shadow-2xl shadow-black/10 dark:shadow-black/30">
         <div className="space-y-6">
           <div className="flex items-center gap-2 px-2 py-1">
             <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
@@ -207,43 +237,6 @@ export function Apps() {
               </div>
             </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-card border rounded-2xl p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold">{appList.filter(a => !a.isComingSoon).length}</div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Active Apps</div>
-                  <div className="font-bold">Pro Account</div>
-                </div>
-              </div>
-              <div className="bg-card border rounded-2xl p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">{appList.filter(a => a.isInternal).length}</div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Internal</div>
-                  <div className="font-bold">Reside Ready</div>
-                </div>
-              </div>
-              <div className="bg-card border rounded-2xl p-4 flex items-center gap-4">
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold ${(() => {
-                  const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
-                  const up = all.filter(v => v >= 0).length;
-                  const pct = all.length ? Math.round((up / all.length) * 100) : 0;
-                  return pct >= 90 ? 'bg-emerald-500/10 text-emerald-500' : pct >= 50 ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500';
-                })()}`}>{(() => {
-                  const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
-                  const up = all.filter(v => v >= 0).length;
-                  return all.length ? Math.round((up / all.length) * 100) + '%' : '—';
-                })()}</div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">System Uptime</div>
-                  <div className="font-bold">{(() => {
-                    const all = healthChecks.flatMap(h => [...(h.frontend !== null ? [h.frontend] : []), ...(h.backend !== null ? [h.backend] : [])]);
-                    const up = all.filter(v => v >= 0).length;
-                    return up === all.length && all.length > 0 ? 'All Systems Go' : 'Degraded';
-                  })()}</div>
-                </div>
-              </div>
-            </div>
-
             <Pm2Section pm2Procs={pm2Procs} pm2Sparklines={pm2Sparklines} wsRef={wsRef} />
             <HealthSection healthChecks={healthChecks} />
 
@@ -288,14 +281,7 @@ export function Apps() {
         {activeSection === 'users' && <UsersPanel />}
         {activeSection === 'deploy' && <DeployDashboard />}
 
-        {activeSection === 'notifications' && (
-          <div className="p-6 md:p-10 max-w-6xl mx-auto text-center py-40">
-            <Bell size={64} className="mx-auto text-muted-foreground/30 mb-6" />
-            <h2 className="text-3xl font-bold mb-2">Notifications</h2>
-            <p className="text-muted-foreground text-lg">You're all caught up! No recent activity to show.</p>
-          </div>
-        )}
-        {activeSection === 'settings' && <SecuritySettings />}
+
       </main>
     </div>
   );

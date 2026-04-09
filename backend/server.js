@@ -166,7 +166,7 @@ async function seedProjects() {
   const seeds = [
     {
       ...defaults, name: 'reNote', code: 'RENOTE', type: 'fullstack',
-      frontendPath: '/home/vyshwa/web/reNote/FE', backendPath: '/home/vyshwa/web/reNote/BE',
+      frontendPath: '/k_live/renote/frontend', backendPath: '/k_live/renote/backend',
       frontendPort: 6001, backendPort: 6003,
       pm2FrontendName: 'renote-frontend', pm2BackendName: 'renote-backend',
       systemdFrontendName: null, systemdBackendName: null,
@@ -174,7 +174,7 @@ async function seedProjects() {
     },
     {
       ...defaults, name: 'ReGen', code: 'REGEN', type: 'fullstack',
-      frontendPath: '/home/vyshwa/web/reGen/frontend', backendPath: '/home/vyshwa/web/reGen/server',
+      frontendPath: '/k_live/regen/frontend', backendPath: '/k_live/regen/backend',
       frontendPort: 2000, backendPort: 5006,
       pm2FrontendName: null, pm2BackendName: 'regen-backend',
       systemdFrontendName: null, systemdBackendName: null,
@@ -182,15 +182,15 @@ async function seedProjects() {
     },
     {
       ...defaults, name: 'KrishHub', code: 'KRISHUB', type: 'fullstack',
-      frontendPath: '/home/vyshwa/web/krishub/frontend', backendPath: '/home/vyshwa/web/krishub/backend',
-      frontendPort: 1001, backendPort: 1002,
+      frontendPath: '/k_live/krishub/frontend', backendPath: '/k_live/krishub/backend',
+      frontendPort: null, backendPort: 1002,
       pm2FrontendName: null, pm2BackendName: null,
-      systemdFrontendName: 'krishub-frontend', systemdBackendName: 'krishub-backend',
+      systemdFrontendName: null, systemdBackendName: 'krishub-backend',
       gitFrontend: 'git@github.com:Vyshwa/Krishub.git', gitBackend: 'git@github.com:Vyshwa/Krishub.git',
     },
     {
       ...defaults, name: 'Auth Service', code: 'AUTH_SERVICE', type: 'backend',
-      frontendPath: null, backendPath: '/home/vyshwa/web/auth-service-be',
+      frontendPath: null, backendPath: '/k_live/auth-service',
       frontendPort: null, backendPort: 3004,
       pm2FrontendName: null, pm2BackendName: 'renote-auth',
       systemdFrontendName: null, systemdBackendName: null,
@@ -199,7 +199,7 @@ async function seedProjects() {
     },
     {
       ...defaults, name: 'Reveal', code: 'REVEAL', type: 'fullstack',
-      frontendPath: '/home/vyshwa/web/reveal/reveal-frontend', backendPath: '/home/vyshwa/web/reveal/reveal-backend',
+      frontendPath: '/k_live/reveal/frontend', backendPath: '/k_live/reveal/backend',
       frontendPort: 3000, backendPort: 5001,
       pm2FrontendName: 'reveal-frontend', pm2BackendName: 'reveal-backend',
       systemdFrontendName: null, systemdBackendName: null,
@@ -839,6 +839,31 @@ const server = http.createServer(async (req, res) => {
       await db.collection('security_settings').updateOne(
         { userId }, { $push: { trustedDevices: device }, $set: { updatedAt: new Date() } }, { upsert: true }
       );
+
+      // If mobile is paired, create an alert for the untrusted device
+      const userDoc = await db.collection('security_settings').findOne({ userId });
+      if (userDoc?.mobilePairing && !device.trusted) {
+        const alert = {
+          id: crypto.randomBytes(8).toString('hex'),
+          deviceId: device.id,
+          deviceName: device.name,
+          browser: device.browser,
+          os: device.os,
+          ip: device.ip,
+          status: 'pending',
+          createdAt: new Date(),
+        };
+        await db.collection('security_settings').updateOne(
+          { userId }, { $push: { mobileAlerts: alert } }
+        );
+        // Push to any connected mobile WS clients for this user
+        const mobileMsg = JSON.stringify({ type: 'mobile-alert', alert, ts: Date.now() });
+        for (const ws of wsClients) {
+          if (ws.readyState === 1 && ws._mobileUserId === userId) ws.send(mobileMsg);
+        }
+        broadcastSecurityUpdate('untrusted-device-detected', { deviceName: device.name });
+      }
+
       return sendJSON(res, 200, { device }, {}, requestOrigin);
     }
 
@@ -1113,11 +1138,14 @@ const server = http.createServer(async (req, res) => {
         lastUsed: new Date(),
         createdAt: new Date(),
       };
+      const mobileAccessToken = crypto.randomBytes(32).toString('hex');
       await db.collection('security_settings').updateOne(
         { _id: doc._id },
         {
           $set: {
             mobilePairing: { deviceName: mobileDevice.name, os: mobileDevice.os, browser: mobileDevice.browser, linkedAt: new Date() },
+            mobileAccessToken,
+            mobileAlerts: [],
             updatedAt: new Date(),
           },
           $push: { trustedDevices: mobileDevice },
@@ -1125,7 +1153,7 @@ const server = http.createServer(async (req, res) => {
         }
       );
       broadcastSecurityUpdate('mobile-paired');
-      return sendJSON(res, 200, { success: true, device: mobileDevice }, {}, requestOrigin);
+      return sendJSON(res, 200, { success: true, device: mobileDevice, mobileAccessToken }, {}, requestOrigin);
     }
 
     /* DELETE /api/settings/security/mobile — unlink mobile */
@@ -1136,12 +1164,90 @@ const server = http.createServer(async (req, res) => {
       await db.collection('security_settings').updateOne(
         { userId },
         {
-          $unset: { mobilePairing: '', mobilePairToken: '', mobilePairExpires: '' },
+          $unset: { mobilePairing: '', mobilePairToken: '', mobilePairExpires: '', mobileAccessToken: '', mobileAlerts: '' },
           $pull: { trustedDevices: { mobile: true } },
           $set: { updatedAt: new Date() },
         }
       );
       broadcastSecurityUpdate('mobile-unlinked');
+      return sendJSON(res, 200, { success: true }, {}, requestOrigin);
+    }
+
+    /* ================================================================== */
+    /*  MOBILE ALERTS — untrusted device notifications                     */
+    /* ================================================================== */
+
+    /* GET /api/settings/security/mobile/alerts — get pending alerts (mobile auth via token) */
+    if (pathname === '/api/settings/security/mobile/alerts' && req.method === 'GET') {
+      const mToken = (req.headers.authorization || '').replace('MobileToken ', '');
+      if (!mToken) return sendJSON(res, 401, { error: 'Mobile token required' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ mobileAccessToken: mToken });
+      if (!doc) return sendJSON(res, 401, { error: 'Invalid mobile token' }, {}, requestOrigin);
+      const alerts = (doc.mobileAlerts || []).filter(a => a.status === 'pending');
+      return sendJSON(res, 200, { alerts }, {}, requestOrigin);
+    }
+
+    /* GET /api/settings/security/mobile/alerts/history — get all alerts including resolved */
+    if (pathname === '/api/settings/security/mobile/alerts/history' && req.method === 'GET') {
+      const mToken = (req.headers.authorization || '').replace('MobileToken ', '');
+      if (!mToken) return sendJSON(res, 401, { error: 'Mobile token required' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ mobileAccessToken: mToken });
+      if (!doc) return sendJSON(res, 401, { error: 'Invalid mobile token' }, {}, requestOrigin);
+      return sendJSON(res, 200, { alerts: doc.mobileAlerts || [] }, {}, requestOrigin);
+    }
+
+    /* POST /api/settings/security/mobile/alerts/:alertId/action — trust or block device from mobile */
+    if (pathname.match(/^\/api\/settings\/security\/mobile\/alerts\/[^/]+\/action$/) && req.method === 'POST') {
+      const mToken = (req.headers.authorization || '').replace('MobileToken ', '');
+      if (!mToken) return sendJSON(res, 401, { error: 'Mobile token required' }, {}, requestOrigin);
+      const alertId = pathname.split('/').slice(-2, -1)[0];
+      const { action } = JSON.parse(await readBody(req));
+      if (!['trust', 'block'].includes(action)) return sendJSON(res, 400, { error: 'Action must be trust or block' }, {}, requestOrigin);
+      await ensureDb();
+      const doc = await db.collection('security_settings').findOne({ mobileAccessToken: mToken });
+      if (!doc) return sendJSON(res, 401, { error: 'Invalid mobile token' }, {}, requestOrigin);
+      const alert = (doc.mobileAlerts || []).find(a => a.id === alertId);
+      if (!alert) return sendJSON(res, 404, { error: 'Alert not found' }, {}, requestOrigin);
+
+      if (action === 'trust') {
+        // Mark device as trusted
+        await db.collection('security_settings').updateOne(
+          { _id: doc._id, 'trustedDevices.id': alert.deviceId },
+          { $set: { 'trustedDevices.$.trusted': true, updatedAt: new Date() } }
+        );
+        // Update alert status
+        await db.collection('security_settings').updateOne(
+          { _id: doc._id, 'mobileAlerts.id': alertId },
+          { $set: { 'mobileAlerts.$.status': 'trusted' } }
+        );
+        broadcastSecurityUpdate('device-trusted-via-mobile', { deviceName: alert.deviceName });
+      } else {
+        // Block = revoke the device
+        await db.collection('security_settings').updateOne(
+          { _id: doc._id },
+          { $pull: { trustedDevices: { id: alert.deviceId } }, $set: { updatedAt: new Date() } }
+        );
+        await db.collection('security_settings').updateOne(
+          { _id: doc._id, 'mobileAlerts.id': alertId },
+          { $set: { 'mobileAlerts.$.status': 'blocked' } }
+        );
+        broadcastSecurityUpdate('device-blocked-via-mobile', { deviceName: alert.deviceName });
+      }
+      return sendJSON(res, 200, { success: true, action }, {}, requestOrigin);
+    }
+
+    /* DELETE /api/settings/security/mobile/alerts/:alertId — dismiss alert */
+    if (pathname.match(/^\/api\/settings\/security\/mobile\/alerts\/[^/]+$/) && req.method === 'DELETE') {
+      const mToken = (req.headers.authorization || '').replace('MobileToken ', '');
+      if (!mToken) return sendJSON(res, 401, { error: 'Mobile token required' }, {}, requestOrigin);
+      const alertId = pathname.split('/').pop();
+      await ensureDb();
+      await db.collection('security_settings').updateOne(
+        { mobileAccessToken: mToken },
+        { $pull: { mobileAlerts: { id: alertId } } }
+      );
       return sendJSON(res, 200, { success: true }, {}, requestOrigin);
     }
 
@@ -1250,25 +1356,25 @@ const server = http.createServer(async (req, res) => {
           }
           logEntry.output = parts.join('\n---\n');
         } else if (action === 'restart') {
-          if (!service) throw new Error('No service configured');
-          if (service.type === 'pm2') {
-            logEntry.output = await safeExec(`pm2 restart ${service.name}`, targetPath);
-          } else if (service.type === 'systemd') {
-            logEntry.output = await safeExec(`sudo systemctl restart ${service.name}`, targetPath);
+          if (service) {
+            if (service.type === 'pm2') logEntry.output = await safeExec(`pm2 restart ${service.name}`, targetPath);
+            else if (service.type === 'systemd') logEntry.output = await safeExec(`sudo systemctl restart ${service.name}`, targetPath);
+          } else {
+            logEntry.output = await safeExec('sudo nginx -t && sudo systemctl reload nginx', targetPath);
           }
         } else if (action === 'stop') {
-          if (!service) throw new Error('No service configured');
-          if (service.type === 'pm2') {
-            logEntry.output = await safeExec(`pm2 stop ${service.name}`, targetPath);
-          } else if (service.type === 'systemd') {
-            logEntry.output = await safeExec(`sudo systemctl stop ${service.name}`, targetPath);
+          if (service) {
+            if (service.type === 'pm2') logEntry.output = await safeExec(`pm2 stop ${service.name}`, targetPath);
+            else if (service.type === 'systemd') logEntry.output = await safeExec(`sudo systemctl stop ${service.name}`, targetPath);
+          } else {
+            logEntry.output = 'Static frontend — no process to stop. Served by nginx.';
           }
         } else if (action === 'start') {
-          if (!service) throw new Error('No service configured');
-          if (service.type === 'pm2') {
-            logEntry.output = await safeExec(`pm2 start ${service.name}`, targetPath);
-          } else if (service.type === 'systemd') {
-            logEntry.output = await safeExec(`sudo systemctl start ${service.name}`, targetPath);
+          if (service) {
+            if (service.type === 'pm2') logEntry.output = await safeExec(`pm2 start ${service.name}`, targetPath);
+            else if (service.type === 'systemd') logEntry.output = await safeExec(`sudo systemctl start ${service.name}`, targetPath);
+          } else {
+            logEntry.output = await safeExec('sudo nginx -t && sudo systemctl reload nginx', targetPath);
           }
         } else {
           throw new Error(`Unknown action: ${action}`);
@@ -1333,6 +1439,25 @@ const server = http.createServer(async (req, res) => {
             ws._subSecurity = true;
           } else if (msg.type === 'unsubscribe-security') {
             ws._subSecurity = false;
+          } else if (msg.type === 'subscribe-mobile-alerts') {
+            // Mobile authenticates with its token to receive push alerts
+            if (msg.token) {
+              ensureDb().then(() => {
+                db.collection('security_settings').findOne({ mobileAccessToken: msg.token }).then(doc => {
+                  if (doc) {
+                    ws._mobileUserId = doc.userId;
+                    ws.send(JSON.stringify({ type: 'mobile-alerts-subscribed', ts: Date.now() }));
+                    // Send any pending alerts immediately
+                    const pending = (doc.mobileAlerts || []).filter(a => a.status === 'pending');
+                    if (pending.length) ws.send(JSON.stringify({ type: 'mobile-alerts-pending', alerts: pending, ts: Date.now() }));
+                  } else {
+                    ws.send(JSON.stringify({ type: 'mobile-alerts-error', error: 'Invalid token' }));
+                  }
+                });
+              });
+            }
+          } else if (msg.type === 'unsubscribe-mobile-alerts') {
+            ws._mobileUserId = null;
           }
         } catch {}
       });
