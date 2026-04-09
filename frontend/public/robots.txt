@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /apps
+Disallow: /login
+Disallow: /register
+Disallow: /sso-redirect
+
+Sitemap: https://krishub.in/sitemap.xml

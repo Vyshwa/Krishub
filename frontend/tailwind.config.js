@@ -89,20 +89,20 @@ export default {
                     '100%': { backgroundPosition: '-200% 0' }
                 },
                 'aurora-1': {
-                    '0%, 100%': { backgroundPosition: '50% 50%', opacity: '0.4' },
-                    '25%': { backgroundPosition: '0% 80%', opacity: '0.7' },
-                    '50%': { backgroundPosition: '80% 20%', opacity: '0.5' },
-                    '75%': { backgroundPosition: '20% 60%', opacity: '0.8' }
+                    '0%, 100%': { transform: 'translate(0%, 0%)', opacity: '0.4' },
+                    '25%': { transform: 'translate(-15%, 10%)', opacity: '0.7' },
+                    '50%': { transform: 'translate(10%, -10%)', opacity: '0.5' },
+                    '75%': { transform: 'translate(-10%, 5%)', opacity: '0.8' }
                 },
                 'aurora-2': {
-                    '0%, 100%': { backgroundPosition: '30% 70%', opacity: '0.3' },
-                    '33%': { backgroundPosition: '70% 30%', opacity: '0.6' },
-                    '66%': { backgroundPosition: '50% 80%', opacity: '0.45' }
+                    '0%, 100%': { transform: 'translate(0%, 0%)', opacity: '0.3' },
+                    '33%': { transform: 'translate(12%, -12%)', opacity: '0.6' },
+                    '66%': { transform: 'translate(-8%, 10%)', opacity: '0.45' }
                 },
                 'aurora-3': {
-                    '0%, 100%': { backgroundPosition: '80% 20%', opacity: '0.35' },
-                    '40%': { backgroundPosition: '20% 80%', opacity: '0.7' },
-                    '80%': { backgroundPosition: '60% 40%', opacity: '0.5' }
+                    '0%, 100%': { transform: 'translate(10%, -10%)', opacity: '0.35' },
+                    '40%': { transform: 'translate(-15%, 15%)', opacity: '0.7' },
+                    '80%': { transform: 'translate(5%, -5%)', opacity: '0.5' }
                 },
                 'border-sweep': {
                     '0%': { transform: 'translateX(-100%)', opacity: '0' },

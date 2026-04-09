@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import logoImg from '@/assets/hardware.jpg';
+import logoImg from '@/assets/hardware_opt.webp';
 import { Badge } from '@/components/ui/badge';
 import { Laptop, Monitor, Mouse, HardDrive, Cpu, Zap, Wrench, Headphones } from 'lucide-react';
 
@@ -36,7 +36,7 @@ export function HardwareServices() {
       <section className="py-12 bg-muted/30">
         <div className="container">
             <div className="max-w-4xl mx-auto">
-            <img src={logoImg} alt="Hardware Collection" className="rounded-lg shadow-xl w-full" />
+            <img src={logoImg} alt="KrishTech professional IT hardware equipment and services" width={800} height={600} loading="lazy" className="rounded-lg shadow-xl w-full" />
           </div>
         </div>
       </section>

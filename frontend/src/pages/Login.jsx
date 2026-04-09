@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useLogin } from '@/hooks/useAuth';
-import loginHero from '@/assets/TopDown.png';
+import loginHero from '@/assets/TopDown.webp';
 import { ShieldCheck, Zap, Globe } from 'lucide-react';
 
 export function Login() {

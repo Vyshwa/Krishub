@@ -110,7 +110,7 @@ export function Refund() {
               </p>
               <div className="mt-3 text-muted-foreground space-y-1">
                 <p>Email: <a href="mailto:info@krishub.in" className="text-primary hover:underline">info@krishub.in</a></p>
-                <p>Phone: 9092024444</p>
+                <p>Phone: +91 909 202 4443, +91 909 202 4444</p>
                 <p>Address: #55, Venkataswamy Road (West), R S Puram, Coimbatore, Tamilnadu, India - 641002</p>
               </div>
             </div>

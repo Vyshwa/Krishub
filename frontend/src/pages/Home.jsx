@@ -1,13 +1,15 @@
 import { Link, useSearch } from '@tanstack/react-router';
-import heroImg from '@/assets/KrishTech Home.png';
-import softwareImg from '@/assets/Software Solutions.png';
-import hardwareImg from '@/assets/hardware.jpg';
-import logoImg from '@/assets/TopDown.png';
+import heroImg from '@/assets/KrishTech Home.jpg';
+import softwareImg from '@/assets/Software Solutions.webp';
+import hardwareImg from '@/assets/hardware_opt.webp';
+import logoImg from '@/assets/TopDown.webp';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Cpu, HardDrive, Shield, Zap } from 'lucide-react';
-import { Apps } from './Apps';
+import { lazy, Suspense } from 'react';
 import { useCurrentUser } from '@/hooks/useAuth';
+
+const Apps = lazy(() => import('./Apps').then(m => ({ default: m.Apps })));
 
 export function Home() {
   const { data: user, isLoading } = useCurrentUser();
@@ -16,7 +18,7 @@ export function Home() {
 
   if (isLoading) return null;
   if (user && !isMarketingView) {
-    return <Apps />;
+    return <Suspense fallback={null}><Apps /></Suspense>;
   }
 
   return (
@@ -24,9 +26,9 @@ export function Home() {
       <section className="relative bg-gradient-to-br from-primary/10 via-background to-secondary/20 py-20 md:py-32 overflow-hidden">
         {/* Ambient background motion */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-primary/5 blur-3xl animate-float" />
-          <div className="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full bg-secondary/10 blur-3xl animate-float-delayed" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl animate-float-slow" />
+          <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-primary/5 blur-3xl animate-float will-change-transform" />
+          <div className="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full bg-secondary/10 blur-3xl animate-float-delayed will-change-transform" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl animate-float-slow will-change-transform" />
         </div>
         <div className="container relative z-10">
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-start">
@@ -55,14 +57,17 @@ export function Home() {
             <div className="relative w-full h-[340px] sm:h-[420px] md:h-[500px] lg:h-[620px] xl:h-[720px] overflow-hidden rounded-xl shadow-2xl lg:self-start lg:justify-self-end group">
               <img
                 src={logoImg}
-                alt="KrishTech"
+                alt="KrishTech Computers logo"
+                width={320}
+                height={320}
+                fetchPriority="high"
                 className="absolute inset-0 w-full h-full object-contain p-4 transition-all duration-500 hover:scale-105 dark:invert dark:hue-rotate-180 dark:brightness-110 dark:contrast-110 dark:[filter:invert(1)_hue-rotate(180deg)_brightness(1.1)_contrast(1.1)_drop-shadow(0_0_3px_rgba(99,102,241,0.8))_drop-shadow(0_0_10px_rgba(99,102,241,0.4))_drop-shadow(0_0_20px_rgba(56,189,248,0.3))_drop-shadow(0_0_40px_rgba(168,85,247,0.2))]"
               />
               {/* Aurora shimmer overlay */}
               <div className="absolute inset-0 pointer-events-none opacity-0 dark:opacity-100">
-                <div className="absolute inset-0 animate-aurora-1 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)] [background-size:150%_150%]" />
-                <div className="absolute inset-0 animate-aurora-2 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12)_0%,transparent_70%)] [background-size:120%_120%]" />
-                <div className="absolute inset-0 animate-aurora-3 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.1)_0%,transparent_70%)] [background-size:130%_130%]" />
+                <div className="absolute -inset-[25%] animate-aurora-1 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)] will-change-transform" />
+                <div className="absolute -inset-[15%] animate-aurora-2 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12)_0%,transparent_70%)] will-change-transform" />
+                <div className="absolute -inset-[20%] animate-aurora-3 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.1)_0%,transparent_70%)] will-change-transform" />
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-border-sweep" />
                 <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/30 to-transparent animate-border-sweep-reverse" />
               </div>
@@ -154,7 +159,10 @@ export function Home() {
               <div className="aspect-video relative overflow-hidden">
                 <img
                   src={softwareImg}
-                  alt="Software Solutions"
+                  alt="KrishTech Software Solutions - custom enterprise applications"
+                  width={399}
+                  height={710}
+                  loading="lazy"
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -167,7 +175,7 @@ export function Home() {
               <CardContent>
                 <Link to="/software">
                   <Button className="w-full">
-                    Learn More
+                    Explore Software Solutions
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -177,7 +185,10 @@ export function Home() {
               <div className="aspect-video relative overflow-hidden">
                 <img
                   src={hardwareImg}
-                  alt="Hardware Services"
+                  alt="KrishTech Hardware Services - professional IT equipment"
+                  width={800}
+                  height={600}
+                  loading="lazy"
                   className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -190,7 +201,7 @@ export function Home() {
               <CardContent>
                 <Link to="/hardware">
                   <Button className="w-full">
-                    Learn More
+                    Explore Hardware Services
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -205,7 +216,7 @@ export function Home() {
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
             Ready to Transform Your IT Infrastructure?
           </h2>
-          <p className="text-lg mb-8 max-w-2xl mx-auto opacity-90">
+          <p className="text-lg mb-8 max-w-2xl mx-auto text-primary-foreground/95">
             Contact us today to discuss how we can help your business thrive with our technology solutions.
           </p>
           <Link to="/contact">

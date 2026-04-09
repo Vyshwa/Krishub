@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Target, Users, Award, TrendingUp } from 'lucide-react';
-import officeImg from '@/assets/KrishTech Home.png';
+import officeImg from '@/assets/KrishTech Home.jpg';
 
 export function About() {
   return (
@@ -41,7 +41,7 @@ export function About() {
               </div>
             </div>
             <div className="relative">
-              <img src={officeImg} alt="KrishTech Office" className="rounded-lg shadow-xl" />
+              <img src={officeImg} alt="KrishTech Computers office and team" width={803} height={399} loading="lazy" className="rounded-lg shadow-xl" />
             </div>
           </div>
         </div>

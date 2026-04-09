@@ -1,6 +1,5 @@
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { Logo } from '@/components/Logo';
 
 export function Footer() {
   return (

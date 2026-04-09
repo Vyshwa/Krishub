@@ -85,8 +85,8 @@ export function Contact() {
                       <div>
                         <h3 className="font-semibold mb-1">Phone</h3>
                         <div className="text-muted-foreground space-y-1">
-                          <p>9092024444</p>
-                          <p>9789719897</p>
+                          <p>+91 909 202 4443</p>
+                          <p>+91 909 202 4444</p>
                         </div>
                       </div>
                     </div>
