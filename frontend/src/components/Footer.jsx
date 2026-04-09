@@ -17,11 +17,11 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="/" className="hover:text-primary transition-colors">Home</a></li>
-              <li><a href="/about" className="hover:text-primary transition-colors">About Us</a></li>
               <li><a href="/software" className="hover:text-primary transition-colors">Software Solutions</a></li>
               <li><a href="/hardware" className="hover:text-primary transition-colors">Hardware Services</a></li>
-              <li><a href="/pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-              <li><a href="/contact" className="hover:text-primary transition-colors">Contact Us</a></li>
+              <li><a href="/hiring" className="hover:text-primary transition-colors">Hiring</a></li>
+              <li><a href="/amc" className="hover:text-primary transition-colors">AMC Warranty</a></li>
+              <li><a href="/rent" className="hover:text-primary transition-colors">Rent PC</a></li>
             </ul>
           </div>
 

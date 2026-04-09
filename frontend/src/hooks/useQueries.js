@@ -34,6 +34,57 @@ export function useGetAllContactForms() {
   });
 }
 
+export function useSubmitAmcEnquiry() {
+  return useMutation({
+    mutationFn: async ({ name, email, phone, plan, systems, message }) => {
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${base}/api/amc-enquiries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, plan, systems, message }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to submit');
+      }
+      return await res.json();
+    },
+  });
+}
+
+export function useSubmitHiringApplication() {
+  return useMutation({
+    mutationFn: async ({ name, email, phone, position, experience, message }) => {
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${base}/api/hiring-applications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, position, experience, message }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to submit');
+      }
+      return await res.json();
+    },
+  });
+}
+
+export function useSubmitRentalEnquiry() {
+  return useMutation({
+    mutationFn: async ({ name, email, phone, category, quantity, duration, message }) => {
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${base}/api/rental-enquiries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, category, quantity, duration, message }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to submit');
+      }
+      return await res.json();
+    },
+  });
+}
+
 export function useGetCallerUserProfile() {
   const query = useQuery({
     queryKey: ['currentUserProfile'],

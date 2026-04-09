@@ -18,10 +18,11 @@ export function Header() {
 
   const navLinks = [
     { path: '/', label: 'Home' },
-    { path: '/about', label: 'About Us' },
     { path: '/software', label: 'Software Solutions' },
     { path: '/hardware', label: 'Hardware Services' },
-    { path: '/contact', label: 'Contact Us' },
+    { path: '/hiring', label: 'Hiring' },
+    { path: '/amc', label: 'AMC Warranty' },
+    { path: '/rent', label: 'Rent PC' },
   ];
 
   const isAppRoute = currentPath === '/apps' || (currentPath === '/' && user);

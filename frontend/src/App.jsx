@@ -11,6 +11,9 @@ import { Pricing } from './pages/Pricing';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { Refund } from './pages/Refund';
+import { AmcWarranty } from './pages/AmcWarranty';
+import { Hiring } from './pages/Hiring';
+import { RentPc } from './pages/RentPc';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ParticleBackground } from './components/ParticleBackground';
@@ -158,6 +161,21 @@ const refundRoute = createRoute({
   path: '/refund',
   component: Refund,
 });
+const amcRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/amc',
+  component: AmcWarranty,
+});
+const hiringRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/hiring',
+  component: Hiring,
+});
+const rentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rent',
+  component: RentPc,
+});
 const pairRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/pair',
@@ -186,6 +204,9 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   termsRoute,
   refundRoute,
+  amcRoute,
+  hiringRoute,
+  rentRoute,
   pairRoute,
   alertsRoute,
 ]);

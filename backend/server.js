@@ -1292,6 +1292,76 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, forms, {}, requestOrigin);
     }
 
+    /* ---------- AMC ENQUIRIES ---------- */
+    if (pathname === '/api/amc-enquiries' && req.method === 'POST') {
+      await ensureDb();
+      const raw = JSON.parse(await readBody(req));
+      const doc = {
+        name: String(raw.name || ''),
+        email: String(raw.email || ''),
+        phone: String(raw.phone || ''),
+        plan: String(raw.plan || ''),
+        systems: parseInt(raw.systems, 10) || 1,
+        message: String(raw.message || ''),
+        createdAt: new Date(),
+      };
+      const result = await db.collection('amc_enquiries').insertOne(doc);
+      return sendJSON(res, 201, { id: result.insertedId.toString() }, {}, requestOrigin);
+    }
+
+    if (pathname === '/api/amc-enquiries' && req.method === 'GET') {
+      await ensureDb();
+      const enquiries = await db.collection('amc_enquiries').find().sort({ createdAt: -1 }).toArray();
+      return sendJSON(res, 200, enquiries, {}, requestOrigin);
+    }
+
+    /* ---------- HIRING APPLICATIONS ---------- */
+    if (pathname === '/api/hiring-applications' && req.method === 'POST') {
+      await ensureDb();
+      const raw = JSON.parse(await readBody(req));
+      const doc = {
+        name: String(raw.name || ''),
+        email: String(raw.email || ''),
+        phone: String(raw.phone || ''),
+        position: String(raw.position || ''),
+        experience: String(raw.experience || ''),
+        message: String(raw.message || ''),
+        createdAt: new Date(),
+      };
+      const result = await db.collection('hiring_applications').insertOne(doc);
+      return sendJSON(res, 201, { id: result.insertedId.toString() }, {}, requestOrigin);
+    }
+
+    if (pathname === '/api/hiring-applications' && req.method === 'GET') {
+      await ensureDb();
+      const apps = await db.collection('hiring_applications').find().sort({ createdAt: -1 }).toArray();
+      return sendJSON(res, 200, apps, {}, requestOrigin);
+    }
+
+    /* ---------- RENTAL ENQUIRIES ---------- */
+    if (pathname === '/api/rental-enquiries' && req.method === 'POST') {
+      await ensureDb();
+      const raw = JSON.parse(await readBody(req));
+      const doc = {
+        name: String(raw.name || ''),
+        email: String(raw.email || ''),
+        phone: String(raw.phone || ''),
+        category: String(raw.category || ''),
+        quantity: parseInt(raw.quantity, 10) || 1,
+        duration: String(raw.duration || ''),
+        message: String(raw.message || ''),
+        createdAt: new Date(),
+      };
+      const result = await db.collection('rental_enquiries').insertOne(doc);
+      return sendJSON(res, 201, { id: result.insertedId.toString() }, {}, requestOrigin);
+    }
+
+    if (pathname === '/api/rental-enquiries' && req.method === 'GET') {
+      await ensureDb();
+      const enquiries = await db.collection('rental_enquiries').find().sort({ createdAt: -1 }).toArray();
+      return sendJSON(res, 200, enquiries, {}, requestOrigin);
+    }
+
     /* ---------- DEPLOY SYSTEM ---------- */
     if (pathname === '/api/deploy/projects' && req.method === 'GET') {
       await ensureDb();
