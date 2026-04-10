@@ -8,6 +8,8 @@ export function DeployDashboard() {
   const [expanded, setExpanded] = useState({});
   const [actionLoading, setActionLoading] = useState(null);
   const [actionResult, setActionResult] = useState(null);
+  const [testAllLoading, setTestAllLoading] = useState(false);
+  const [testAllResults, setTestAllResults] = useState(null);
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -43,6 +45,32 @@ export function DeployDashboard() {
     fetchProjects();
   };
 
+  const runTestAll = async () => {
+    const API = process.env.NEXT_PUBLIC_API_URL || '';
+    setTestAllLoading(true);
+    setTestAllResults(null);
+    const results = [];
+    for (const proj of projects) {
+      for (const target of ['frontend', 'backend']) {
+        const path = proj[target === 'frontend' ? 'frontendPath' : 'backendPath'];
+        if (!path) continue;
+        try {
+          const res = await fetch(`${API}/api/deploy/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId: proj._id, action: 'test', target }),
+          });
+          const data = await res.json();
+          results.push({ projectName: proj.name, target, ...data });
+        } catch (e) {
+          results.push({ projectName: proj.name, target, status: 'error', output: e.message });
+        }
+      }
+    }
+    setTestAllResults(results);
+    setTestAllLoading(false);
+  };
+
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
@@ -53,6 +81,27 @@ export function DeployDashboard() {
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
+
+      {/* Test All Projects */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={testAllLoading || projects.length === 0}
+          onClick={runTestAll}
+          className="gap-1 text-xs"
+        >
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {testAllLoading ? 'Testing All...' : 'Test All Projects'}
+        </Button>
+        {testAllLoading && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <RefreshCw className="h-3 w-3 animate-spin" /> Running security tests across all projects...
+          </span>
+        )}
+      </div>
+
+      {testAllResults && <AllProjectsTestPanel results={testAllResults} />}
 
       {/* Projects */}
       <section className="space-y-3">
@@ -181,6 +230,114 @@ export function DeployDashboard() {
           })}
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  All Projects Test Panel – combined results from Test All          */
+/* ------------------------------------------------------------------ */
+function AllProjectsTestPanel({ results }) {
+  const [panelState, setPanelState] = useState('normal');
+
+  const projectGroups = useMemo(() => {
+    const groups = {};
+    for (const r of results) {
+      const key = `${r.projectName} / ${r.target}`;
+      const sections = parseTestSections(r.output);
+      groups[key] = { ...r, sections, threats: sections.filter(s => s.hasThreat), passed: sections.filter(s => s.isPass) };
+    }
+    return groups;
+  }, [results]);
+
+  const totalThreats = Object.values(projectGroups).reduce((sum, g) => sum + g.threats.length, 0);
+  const totalPassed = Object.values(projectGroups).reduce((sum, g) => sum + g.passed.length, 0);
+
+  if (panelState === 'closed') return null;
+
+  const handleDownload = () => {
+    const lines = [`All Projects Security Test Results`, `${'='.repeat(60)}`, `Date: ${new Date().toISOString()}`, `Total: ${totalPassed} passed, ${totalThreats} threats`, ''];
+    for (const [label, g] of Object.entries(projectGroups)) {
+      lines.push(`\n${'#'.repeat(60)}`);
+      lines.push(`# ${label.toUpperCase()}`);
+      lines.push(`# Status: ${g.status} — ${g.threats.length} threats, ${g.passed.length} passed`);
+      lines.push(`${'#'.repeat(60)}\n`);
+      lines.push(g.output || 'No output');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all-projects-security-test-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className={`rounded-lg border overflow-hidden transition-all ${
+      panelState === 'maximized' ? 'fixed inset-4 z-50 bg-card shadow-2xl' : ''
+    }`}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <span className="text-xs font-semibold">All Projects — Security Test Results</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            totalThreats > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+          }`}>
+            {totalThreats > 0 ? `${totalThreats} threat${totalThreats > 1 ? 's' : ''}` : 'All clear'}
+          </span>
+          <span className="text-xs text-muted-foreground">{totalPassed} passed · {totalThreats} failed · {Object.keys(projectGroups).length} targets</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as TXT">
+            <FileDown className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPanelState(s => s === 'minimized' ? 'normal' : 'minimized')} title={panelState === 'minimized' ? 'Restore' : 'Minimize'}>
+            <Minimize2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPanelState(s => s === 'maximized' ? 'normal' : 'maximized')} title={panelState === 'maximized' ? 'Restore' : 'Maximize'}>
+            <Maximize2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPanelState('closed')} title="Close">
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {panelState !== 'minimized' && (
+        <div className={`p-3 space-y-4 overflow-auto ${panelState === 'maximized' ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[32rem]'}`}>
+          {Object.entries(projectGroups).map(([label, g]) => (
+            <div key={label} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Box className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-bold">{label}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  g.threats.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                }`}>
+                  {g.threats.length > 0 ? `${g.threats.length} threat${g.threats.length > 1 ? 's' : ''}` : '✓ clear'}
+                </span>
+                <span className="text-xs text-muted-foreground">{g.passed.length} passed</span>
+              </div>
+
+              {g.threats.length > 0 && g.threats.map((s, i) => (
+                <div key={`t-${i}`} className="ml-6 p-2 rounded-md bg-red-500/10 border border-red-500/20">
+                  <p className="text-xs font-bold text-red-400 mb-1">{s.title}</p>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90">{s.body}</pre>
+                </div>
+              ))}
+
+              {g.passed.length > 0 && g.passed.map((s, i) => (
+                <div key={`p-${i}`} className="ml-6 p-2 rounded-md bg-green-500/10 border border-green-500/20">
+                  <p className="text-xs font-bold text-green-400 mb-1">{s.title}</p>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-green-300/90">{s.body}</pre>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
