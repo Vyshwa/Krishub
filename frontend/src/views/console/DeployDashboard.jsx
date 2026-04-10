@@ -237,6 +237,7 @@ export function DeployDashboard() {
 /* ------------------------------------------------------------------ */
 function Disclosure({ open: defaultOpen = false, summary, className = '', children }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { setOpen(defaultOpen); }, [defaultOpen]);
   return (
     <div className={className} data-disclosure data-open={open || undefined}>
       <button type="button" onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none">
