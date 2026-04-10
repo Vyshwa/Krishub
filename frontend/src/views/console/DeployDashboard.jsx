@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Rocket, RefreshCw, ChevronDown, ChevronUp, GitBranch, Download, Hammer, Zap, RotateCcw, Square, Play, Wrench, Box, ShieldCheck, Lock, Minimize2, Maximize2, X, FileDown } from 'lucide-react';
+import { Rocket, RefreshCw, ChevronDown, ChevronUp, ChevronRight, GitBranch, Download, Hammer, Zap, RotateCcw, Square, Play, Wrench, Box, ShieldCheck, Lock, Minimize2, Maximize2, X, FileDown, ChevronsUpDown } from 'lucide-react';
 
 export function DeployDashboard() {
   const [projects, setProjects] = useState([]);
@@ -233,10 +233,28 @@ export function DeployDashboard() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Disclosure – a collapsible section with animated arrow            */
+/* ------------------------------------------------------------------ */
+function Disclosure({ open: defaultOpen = false, summary, className = '', children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={className} data-disclosure data-open={open || undefined}>
+      <button type="button" onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none">
+        <ChevronRight className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        {summary}
+      </button>
+      {open && <div className="mt-1">{children}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  All Projects Test Panel – combined results from Test All          */
 /* ------------------------------------------------------------------ */
 function AllProjectsTestPanel({ results }) {
   const [panelState, setPanelState] = useState('normal');
+  const [allOpen, setAllOpen] = useState(null); // null = default, true/false = forced
+  const bodyRef = useRef(null);
 
   const projectGroups = useMemo(() => {
     const groups = {};
@@ -251,6 +269,10 @@ function AllProjectsTestPanel({ results }) {
   const totalThreats = Object.values(projectGroups).reduce((sum, g) => sum + g.threats.length, 0);
   const totalPassed = Object.values(projectGroups).reduce((sum, g) => sum + g.passed.length, 0);
   const totalErrors = Object.values(projectGroups).reduce((sum, g) => sum + g.errors.length, 0);
+  const totalChecks = totalThreats + totalPassed + totalErrors;
+
+  // Reset forced state when results change
+  useEffect(() => setAllOpen(null), [results]);
 
   if (panelState === 'closed') return null;
 
@@ -262,23 +284,31 @@ function AllProjectsTestPanel({ results }) {
     downloadHtml(html, `all-projects-security-test-${new Date().toISOString().slice(0, 10)}.html`);
   };
 
+  const isOpen = (defaultVal) => allOpen !== null ? allOpen : defaultVal;
+
   return (
     <div className={`rounded-lg border overflow-hidden transition-all ${
       panelState === 'maximized' ? 'fixed inset-4 z-50 bg-card shadow-2xl' : ''
     }`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold">All Projects — Security Test Results</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            totalThreats > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
-          }`}>
-            {totalThreats > 0 ? `${totalThreats} threat${totalThreats > 1 ? 's' : ''}` : 'All clear'}
-          </span>
-          <span className="text-xs text-muted-foreground">{totalPassed} passed · {totalThreats} failed{totalErrors > 0 ? ` · ${totalErrors} error${totalErrors > 1 ? 's' : ''}` : ''} · {Object.keys(projectGroups).length} targets</span>
+      {/* Sticky toolbar */}
+      <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 bg-muted/80 backdrop-blur border-b">
+        <div className="flex items-center gap-2 flex-wrap">
+          <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-xs font-semibold whitespace-nowrap">All Projects</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-semibold">{totalPassed} passed</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">{totalThreats} threat{totalThreats !== 1 ? 's' : ''}</span>
+            {totalErrors > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 font-semibold">{totalErrors} error{totalErrors !== 1 ? 's' : ''}</span>}
+            <span className="text-xs text-muted-foreground">{totalChecks} checks · {Object.keys(projectGroups).length} targets</span>
+          </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAllOpen(true)} title="Expand All">
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAllOpen(false)} title="Collapse All">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as HTML">
             <FileDown className="h-3.5 w-3.5" />
           </Button>
@@ -296,43 +326,70 @@ function AllProjectsTestPanel({ results }) {
 
       {/* Body */}
       {panelState !== 'minimized' && (
-        <div className={`p-3 space-y-4 overflow-auto ${panelState === 'maximized' ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[32rem]'}`}>
-          {Object.entries(projectGroups).map(([label, g]) => (
-            <div key={label} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Box className="h-4 w-4 text-blue-400" />
-                <span className="text-sm font-bold">{label}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  g.threats.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
-                }`}>
-                  {g.threats.length > 0 ? `${g.threats.length} threat${g.threats.length > 1 ? 's' : ''}` : '✓ clear'}
-                </span>
-                <span className="text-xs text-muted-foreground">{g.passed.length} passed</span>
-                {g.errors.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">{g.errors.length} error{g.errors.length > 1 ? 's' : ''}</span>}
-              </div>
-
-              {g.threats.length > 0 && g.threats.map((s, i) => (
-                <div key={`t-${i}`} className="ml-6 p-2 rounded-md bg-red-500/10 border border-red-500/20">
-                  <p className="text-xs font-bold text-red-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90">{s.body}</pre>
+        <div ref={bodyRef} className={`p-3 space-y-3 overflow-auto ${panelState === 'maximized' ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[32rem]'}`}>
+          {Object.entries(projectGroups).map(([label, g]) => {
+            const hasIssues = g.threats.length > 0 || g.errors.length > 0;
+            return (
+              <Disclosure key={label} open={isOpen(hasIssues)} className="rounded-lg border overflow-hidden" summary={
+                <div className="flex items-center gap-2 py-1 px-1 bg-muted/30 flex-1 rounded">
+                  <Box className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                  <span className="text-xs font-bold truncate">{label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${g.threats.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                    {g.threats.length > 0 ? `${g.threats.length} threat${g.threats.length > 1 ? 's' : ''}` : '✓ clear'}
+                  </span>
+                  {g.errors.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 font-semibold">{g.errors.length} err</span>}
+                  <span className="text-[10px] text-muted-foreground">{g.sections.length} checks</span>
                 </div>
-              ))}
+              }>
+                <div className="pl-4 space-y-2 pb-1">
+                  {/* Threats */}
+                  {g.threats.length > 0 && (
+                    <Disclosure open={isOpen(true)} className="space-y-1" summary={
+                      <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">⚠ Has Vulnerability ({g.threats.length})</span>
+                    }>
+                      {g.threats.map((s, i) => (
+                        <Disclosure key={`t-${i}`} open={isOpen(true)} className="ml-2 p-2 rounded-md bg-red-500/10 border border-red-500/20" summary={
+                          <span className="text-xs font-bold text-red-400">{s.title}</span>
+                        }>
+                          <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90 mt-1">{s.body}</pre>
+                        </Disclosure>
+                      ))}
+                    </Disclosure>
+                  )}
 
-              {g.errors.length > 0 && g.errors.map((s, i) => (
-                <div key={`e-${i}`} className="ml-6 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20">
-                  <p className="text-xs font-bold text-yellow-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90">{s.body}</pre>
-                </div>
-              ))}
+                  {/* Errors */}
+                  {g.errors.length > 0 && (
+                    <Disclosure open={isOpen(false)} className="space-y-1" summary={
+                      <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-wide">⚡ Command Error ({g.errors.length})</span>
+                    }>
+                      {g.errors.map((s, i) => (
+                        <Disclosure key={`e-${i}`} open={isOpen(false)} className="ml-2 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20" summary={
+                          <span className="text-xs font-bold text-yellow-400">{s.title}</span>
+                        }>
+                          <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90 mt-1">{s.body}</pre>
+                        </Disclosure>
+                      ))}
+                    </Disclosure>
+                  )}
 
-              {g.passed.length > 0 && g.passed.map((s, i) => (
-                <div key={`p-${i}`} className="ml-6 p-2 rounded-md bg-green-500/10 border border-green-500/20">
-                  <p className="text-xs font-bold text-green-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-green-300/90">{s.body}</pre>
+                  {/* Passed */}
+                  {g.passed.length > 0 && (
+                    <Disclosure open={isOpen(false)} className="space-y-1" summary={
+                      <span className="text-[10px] font-bold text-green-400 uppercase tracking-wide">✓ No Vulnerability ({g.passed.length})</span>
+                    }>
+                      {g.passed.map((s, i) => (
+                        <Disclosure key={`p-${i}`} open={isOpen(false)} className="ml-2 p-2 rounded-md bg-green-500/10 border border-green-500/20" summary={
+                          <span className="text-xs font-bold text-green-400">{s.title}</span>
+                        }>
+                          <pre className="text-xs font-mono whitespace-pre-wrap text-green-300/90 mt-1">{s.body}</pre>
+                        </Disclosure>
+                      ))}
+                    </Disclosure>
+                  )}
                 </div>
-              ))}
-            </div>
-          ))}
+              </Disclosure>
+            );
+          })}
         </div>
       )}
     </div>
@@ -465,12 +522,15 @@ function parseTestSections(output) {
 }
 
 function TestResultPanel({ result }) {
-  const [panelState, setPanelState] = useState('normal'); // 'normal' | 'minimized' | 'maximized' | 'closed'
+  const [panelState, setPanelState] = useState('normal');
+  const [allOpen, setAllOpen] = useState(null);
   const isTestAction = result.key?.includes('-test-');
   const sections = useMemo(() => isTestAction ? parseTestSections(result.output) : [], [result.output, isTestAction]);
   const threats = sections.filter(s => s.hasThreat);
   const passed = sections.filter(s => s.isPass);
   const errors = sections.filter(s => s.isError);
+
+  useEffect(() => setAllOpen(null), [result.output]);
 
   if (panelState === 'closed') return null;
 
@@ -491,23 +551,31 @@ function TestResultPanel({ result }) {
     );
   }
 
+  const isOpen = (defaultVal) => allOpen !== null ? allOpen : defaultVal;
+
   return (
     <div className={`mt-2 rounded-lg border overflow-hidden transition-all ${
       panelState === 'maximized' ? 'fixed inset-4 z-50 bg-card shadow-2xl' : ''
     }`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold">Security Test Results</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            threats.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
-          }`}>
-            {threats.length > 0 ? `${threats.length} threat${threats.length > 1 ? 's' : ''}` : 'All clear'}
-          </span>
-          <span className="text-xs text-muted-foreground">{passed.length} passed · {threats.length} failed{errors.length > 0 ? ` · ${errors.length} error${errors.length > 1 ? 's' : ''}` : ''}</span>
+      {/* Sticky toolbar */}
+      <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 bg-muted/80 backdrop-blur border-b">
+        <div className="flex items-center gap-2 flex-wrap">
+          <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-xs font-semibold whitespace-nowrap">Security Test</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-semibold">{passed.length} passed</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">{threats.length} threat{threats.length !== 1 ? 's' : ''}</span>
+            {errors.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 font-semibold">{errors.length} error{errors.length !== 1 ? 's' : ''}</span>}
+            <span className="text-xs text-muted-foreground">{sections.length} checks</span>
+          </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAllOpen(true)} title="Expand All">
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAllOpen(false)} title="Collapse All">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as HTML">
             <FileDown className="h-3.5 w-3.5" />
           </Button>
@@ -526,43 +594,49 @@ function TestResultPanel({ result }) {
       {/* Body */}
       {panelState !== 'minimized' && (
         <div className={`p-3 space-y-3 overflow-auto ${panelState === 'maximized' ? 'max-h-[calc(100vh-8rem)]' : 'max-h-80'}`}>
-          {/* Threats category */}
+          {/* Threats */}
           {threats.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-red-400 mb-2 uppercase tracking-wide">⚠ Has Vulnerability ({threats.length})</p>
+            <Disclosure open={isOpen(true)} className="space-y-1" summary={
+              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">⚠ Has Vulnerability ({threats.length})</span>
+            }>
               {threats.map((s, i) => (
-                <div key={i} className="mb-2 p-2.5 rounded-md bg-red-500/10 border border-red-500/20">
-                  <p className="text-xs font-bold text-red-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90">{s.body}</pre>
-                </div>
+                <Disclosure key={i} open={isOpen(true)} className="p-2 rounded-md bg-red-500/10 border border-red-500/20" summary={
+                  <span className="text-xs font-bold text-red-400">{s.title}</span>
+                }>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90 mt-1">{s.body}</pre>
+                </Disclosure>
               ))}
-            </div>
+            </Disclosure>
           )}
 
-          {/* Errors category */}
+          {/* Errors */}
           {errors.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-yellow-400 mb-2 uppercase tracking-wide">⚡ Command Error ({errors.length})</p>
+            <Disclosure open={isOpen(false)} className="space-y-1" summary={
+              <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-wide">⚡ Command Error ({errors.length})</span>
+            }>
               {errors.map((s, i) => (
-                <div key={i} className="mb-2 p-2.5 rounded-md bg-yellow-500/10 border border-yellow-500/20">
-                  <p className="text-xs font-bold text-yellow-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90">{s.body}</pre>
-                </div>
+                <Disclosure key={i} open={isOpen(false)} className="p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20" summary={
+                  <span className="text-xs font-bold text-yellow-400">{s.title}</span>
+                }>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90 mt-1">{s.body}</pre>
+                </Disclosure>
               ))}
-            </div>
+            </Disclosure>
           )}
 
-          {/* Passed category */}
+          {/* Passed */}
           {passed.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-green-400 mb-2 uppercase tracking-wide">✓ No Vulnerability ({passed.length})</p>
+            <Disclosure open={isOpen(false)} className="space-y-1" summary={
+              <span className="text-[10px] font-bold text-green-400 uppercase tracking-wide">✓ No Vulnerability ({passed.length})</span>
+            }>
               {passed.map((s, i) => (
-                <div key={i} className="mb-2 p-2.5 rounded-md bg-green-500/10 border border-green-500/20">
-                  <p className="text-xs font-bold text-green-400 mb-1">{s.title}</p>
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-green-300/90">{s.body}</pre>
-                </div>
+                <Disclosure key={i} open={isOpen(false)} className="p-2 rounded-md bg-green-500/10 border border-green-500/20" summary={
+                  <span className="text-xs font-bold text-green-400">{s.title}</span>
+                }>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-green-300/90 mt-1">{s.body}</pre>
+                </Disclosure>
               ))}
-            </div>
+            </Disclosure>
           )}
         </div>
       )}
