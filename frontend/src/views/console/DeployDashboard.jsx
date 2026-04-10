@@ -254,12 +254,11 @@ function AllProjectsTestPanel({ results }) {
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
-    const date = new Date().toISOString();
     const blocks = Object.entries(projectGroups).map(([label, g]) => ({
       name: label, sections: g.sections, threats: g.threats.length, passed: g.passed.length,
     }));
-    const xml = buildXml('All Projects Security Test Results', date, '', blocks);
-    downloadXml(xml, `all-projects-security-test-${date.slice(0, 10)}.xml`);
+    const html = buildHtml('All Projects Security Test Results', blocks);
+    downloadHtml(html, `all-projects-security-test-${new Date().toISOString().slice(0, 10)}.html`);
   };
 
   return (
@@ -339,91 +338,66 @@ const PASS_KEYWORDS = ['(good)', 'No sensitive files exposed', 'No CORS headers 
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-function buildXml(title, date, summaryAttrs, projectBlocks) {
-  const xsl = `<?xml-stylesheet type="text/xsl" href="#style"?>`;
-  const stylesheet = `
-  <xsl:stylesheet id="style" version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-    <xsl:template match="/">
-      <html><head><style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f14; color: #e2e2e8; padding: 2rem; }
-        h1 { color: #a0b4ff; border-bottom: 2px solid #333; padding-bottom: .5rem; }
-        h2 { color: #8899cc; margin-top: 1.5rem; }
-        .summary { background: #1a1a24; border: 1px solid #333; border-radius: 8px; padding: 1rem; margin: 1rem 0; display: flex; gap: 2rem; }
-        .summary .stat { text-align: center; }
-        .stat .num { font-size: 1.5rem; font-weight: bold; }
-        .stat.pass .num { color: #4ade80; }
-        .stat.fail .num { color: #f87171; }
-        .project { margin: 1.5rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
-        .project-header { background: #1a1a24; padding: .75rem 1rem; font-weight: bold; display: flex; align-items: center; gap: .75rem; }
-        .badge { font-size: .75rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
-        .badge-pass { background: rgba(74,222,128,.15); color: #4ade80; }
-        .badge-fail { background: rgba(248,113,113,.15); color: #f87171; }
-        .section { margin: .5rem 1rem; padding: .75rem; border-radius: 6px; }
-        .section-pass { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.2); }
-        .section-fail { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); }
-        .section-title { font-weight: bold; font-size: .85rem; margin-bottom: .25rem; }
-        .section-pass .section-title { color: #4ade80; }
-        .section-fail .section-title { color: #f87171; }
-        .section-body { font-family: 'SF Mono', 'Consolas', monospace; font-size: .8rem; white-space: pre-wrap; opacity: .85; }
-        .section-pass .section-body { color: #86efac; }
-        .section-fail .section-body { color: #fca5a5; }
-        .category-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: .5rem 1rem; }
-        .category-label.fail { color: #f87171; }
-        .category-label.pass { color: #4ade80; }
-        .footer { margin-top: 2rem; font-size: .75rem; color: #666; text-align: center; }
-      </style></head><body>
-        <h1><xsl:value-of select="/security-report/@title"/></h1>
-        <div class="summary">
-          <div class="stat pass"><div class="num"><xsl:value-of select="/security-report/summary/@passed"/></div><div>Passed</div></div>
-          <div class="stat fail"><div class="num"><xsl:value-of select="/security-report/summary/@threats"/></div><div>Threats</div></div>
-          <div class="stat"><div class="num"><xsl:value-of select="/security-report/summary/@total"/></div><div>Total Checks</div></div>
-        </div>
-        <xsl:for-each select="/security-report/project">
-          <div class="project">
-            <div class="project-header">
-              <xsl:value-of select="@name"/>
-              <xsl:choose>
-                <xsl:when test="@threats > 0"><span class="badge badge-fail"><xsl:value-of select="@threats"/> threat<xsl:if test="@threats > 1">s</xsl:if></span></xsl:when>
-                <xsl:otherwise><span class="badge badge-pass">✓ clear</span></xsl:otherwise>
-              </xsl:choose>
-            </div>
-            <xsl:if test="section[@status='fail']">
-              <div class="category-label fail">⚠ Has Vulnerability</div>
-              <xsl:for-each select="section[@status='fail']">
-                <div class="section section-fail"><div class="section-title"><xsl:value-of select="@title"/></div><div class="section-body"><xsl:value-of select="."/></div></div>
-              </xsl:for-each>
-            </xsl:if>
-            <xsl:if test="section[@status='pass']">
-              <div class="category-label pass">✓ No Vulnerability</div>
-              <xsl:for-each select="section[@status='pass']">
-                <div class="section section-pass"><div class="section-title"><xsl:value-of select="@title"/></div><div class="section-body"><xsl:value-of select="."/></div></div>
-              </xsl:for-each>
-            </xsl:if>
-          </div>
-        </xsl:for-each>
-        <div class="footer">Generated by KrishHub Security Scanner · <xsl:value-of select="/security-report/@date"/></div>
-      </body></html>
-    </xsl:template>
-  </xsl:stylesheet>`;
+const HTML_STYLES = `
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f0f14; color: #e2e2e8; padding: 2rem; margin: 0; }
+  h1 { color: #a0b4ff; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  .summary { background: #1a1a24; border: 1px solid #333; border-radius: 8px; padding: 1rem 2rem; margin: 1rem 0; display: flex; gap: 2.5rem; }
+  .stat { text-align: center; }
+  .stat .num { font-size: 2rem; font-weight: bold; }
+  .stat .label { font-size: .75rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+  .stat.pass .num { color: #4ade80; }
+  .stat.fail .num { color: #f87171; }
+  .stat.total .num { color: #a0b4ff; }
+  .project { margin: 1.5rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+  .project-header { background: #1a1a24; padding: .75rem 1rem; font-weight: bold; font-size: 1rem; display: flex; align-items: center; gap: .75rem; }
+  .badge { font-size: .7rem; padding: 2px 10px; border-radius: 9999px; font-weight: 600; }
+  .badge-pass { background: rgba(74,222,128,.15); color: #4ade80; }
+  .badge-fail { background: rgba(248,113,113,.15); color: #f87171; }
+  .badge-count { background: rgba(160,180,255,.15); color: #a0b4ff; font-size: .7rem; padding: 2px 8px; border-radius: 9999px; }
+  .cat { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .6rem 1rem .2rem; }
+  .cat-fail { color: #f87171; }
+  .cat-pass { color: #4ade80; }
+  .section { margin: .4rem 1rem; padding: .6rem .75rem; border-radius: 6px; }
+  .section-pass { background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.18); }
+  .section-fail { background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.18); }
+  .section-title { font-weight: 700; font-size: .8rem; margin-bottom: .2rem; }
+  .section-pass .section-title { color: #4ade80; }
+  .section-fail .section-title { color: #f87171; }
+  .section-body { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: .75rem; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
+  .section-pass .section-body { color: #86efac; }
+  .section-fail .section-body { color: #fca5a5; }
+  .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #222; font-size: .7rem; color: #555; text-align: center; }
+  .pb { padding-bottom: .5rem; }
+  @media print { body { background: #fff; color: #111; } .section-pass .section-title, .cat-pass { color: #16a34a; } .section-fail .section-title, .cat-fail { color: #dc2626; } .section-pass .section-body { color: #166534; } .section-fail .section-body { color: #991b1b; } .stat.pass .num { color: #16a34a; } .stat.fail .num { color: #dc2626; } .project-header, .summary { background: #f3f4f6; border-color: #ddd; } .section-pass { background: #f0fdf4; border-color: #bbf7d0; } .section-fail { background: #fef2f2; border-color: #fecaca; } }
+`;
 
+function buildHtml(title, projectBlocks) {
+  const date = new Date().toISOString();
   const totalChecks = projectBlocks.reduce((s, p) => s + p.sections.length, 0);
   const totalThreats = projectBlocks.reduce((s, p) => s + p.threats, 0);
   const totalPassed = projectBlocks.reduce((s, p) => s + p.passed, 0);
 
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n${xsl}\n<security-report title="${esc(title)}" date="${esc(date)}" ${summaryAttrs || ''}>\n${stylesheet}\n  <summary passed="${totalPassed}" threats="${totalThreats}" total="${totalChecks}"/>\n`;
+  let projects = '';
   for (const p of projectBlocks) {
-    xml += `  <project name="${esc(p.name)}" status="${p.threats > 0 ? 'fail' : 'pass'}" threats="${p.threats}" passed="${p.passed}">\n`;
-    for (const s of p.sections) {
-      xml += `    <section title="${esc(s.title)}" status="${s.hasThreat ? 'fail' : 'pass'}">${esc(s.body)}</section>\n`;
+    const fails = p.sections.filter(s => s.hasThreat);
+    const passes = p.sections.filter(s => !s.hasThreat);
+    projects += `<div class="project"><div class="project-header">${esc(p.name)} <span class="badge ${p.threats > 0 ? 'badge-fail' : 'badge-pass'}">${p.threats > 0 ? p.threats + ' threat' + (p.threats > 1 ? 's' : '') : '\u2713 clear'}</span> <span class="badge-count">${p.sections.length} checks</span></div>`;
+    if (fails.length) {
+      projects += `<div class="cat cat-fail">\u26a0 Has Vulnerability (${fails.length})</div>`;
+      for (const s of fails) projects += `<div class="section section-fail"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
     }
-    xml += `  </project>\n`;
+    if (passes.length) {
+      projects += `<div class="cat cat-pass">\u2713 No Vulnerability (${passes.length})</div>`;
+      for (const s of passes) projects += `<div class="section section-pass"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
+    }
+    projects += `<div class="pb"></div></div>`;
   }
-  xml += `</security-report>`;
-  return xml;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${HTML_STYLES}</style></head><body><h1>${esc(title)}</h1><div class="summary"><div class="stat pass"><div class="num">${totalPassed}</div><div class="label">Passed</div></div><div class="stat fail"><div class="num">${totalThreats}</div><div class="label">Threats</div></div><div class="stat total"><div class="num">${totalChecks}</div><div class="label">Total Checks</div></div></div>${projects}<div class="footer">Generated by KrishHub Security Scanner &middot; ${esc(date)}</div></body></html>`;
 }
 
-function downloadXml(xml, filename) {
-  const blob = new Blob([xml], { type: 'application/xml' });
+function downloadHtml(html, filename) {
+  const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -456,10 +430,9 @@ function TestResultPanel({ result }) {
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
-    const date = new Date().toISOString();
     const blocks = [{ name: 'Security Test', sections, threats: threats.length, passed: passed.length }];
-    const xml = buildXml('Security Test Results', date, `status="${result.status}"`, blocks);
-    downloadXml(xml, `security-test-${date.slice(0, 10)}.xml`);
+    const html = buildHtml('Security Test Results', blocks);
+    downloadHtml(html, `security-test-${new Date().toISOString().slice(0, 10)}.html`);
   };
 
   // Non-test actions: simple output
