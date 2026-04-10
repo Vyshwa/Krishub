@@ -243,19 +243,20 @@ function AllProjectsTestPanel({ results }) {
     for (const r of results) {
       const key = `${r.projectName} / ${r.target}`;
       const sections = parseTestSections(r.output);
-      groups[key] = { ...r, sections, threats: sections.filter(s => s.hasThreat), passed: sections.filter(s => s.isPass) };
+      groups[key] = { ...r, sections, threats: sections.filter(s => s.hasThreat), passed: sections.filter(s => s.isPass), errors: sections.filter(s => s.isError) };
     }
     return groups;
   }, [results]);
 
   const totalThreats = Object.values(projectGroups).reduce((sum, g) => sum + g.threats.length, 0);
   const totalPassed = Object.values(projectGroups).reduce((sum, g) => sum + g.passed.length, 0);
+  const totalErrors = Object.values(projectGroups).reduce((sum, g) => sum + g.errors.length, 0);
 
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
     const blocks = Object.entries(projectGroups).map(([label, g]) => ({
-      name: label, sections: g.sections, threats: g.threats.length, passed: g.passed.length,
+      name: label, sections: g.sections, threats: g.threats.length, passed: g.passed.length, errors: g.errors.length,
     }));
     const html = buildHtml('All Projects Security Test Results', blocks);
     downloadHtml(html, `all-projects-security-test-${new Date().toISOString().slice(0, 10)}.html`);
@@ -275,10 +276,10 @@ function AllProjectsTestPanel({ results }) {
           }`}>
             {totalThreats > 0 ? `${totalThreats} threat${totalThreats > 1 ? 's' : ''}` : 'All clear'}
           </span>
-          <span className="text-xs text-muted-foreground">{totalPassed} passed · {totalThreats} failed · {Object.keys(projectGroups).length} targets</span>
+          <span className="text-xs text-muted-foreground">{totalPassed} passed · {totalThreats} failed{totalErrors > 0 ? ` · ${totalErrors} error${totalErrors > 1 ? 's' : ''}` : ''} · {Object.keys(projectGroups).length} targets</span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as TXT">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as HTML">
             <FileDown className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPanelState(s => s === 'minimized' ? 'normal' : 'minimized')} title={panelState === 'minimized' ? 'Restore' : 'Minimize'}>
@@ -307,12 +308,20 @@ function AllProjectsTestPanel({ results }) {
                   {g.threats.length > 0 ? `${g.threats.length} threat${g.threats.length > 1 ? 's' : ''}` : '✓ clear'}
                 </span>
                 <span className="text-xs text-muted-foreground">{g.passed.length} passed</span>
+                {g.errors.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">{g.errors.length} error{g.errors.length > 1 ? 's' : ''}</span>}
               </div>
 
               {g.threats.length > 0 && g.threats.map((s, i) => (
                 <div key={`t-${i}`} className="ml-6 p-2 rounded-md bg-red-500/10 border border-red-500/20">
                   <p className="text-xs font-bold text-red-400 mb-1">{s.title}</p>
                   <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90">{s.body}</pre>
+                </div>
+              ))}
+
+              {g.errors.length > 0 && g.errors.map((s, i) => (
+                <div key={`e-${i}`} className="ml-6 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-xs font-bold text-yellow-400 mb-1">{s.title}</p>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90">{s.body}</pre>
                 </div>
               ))}
 
@@ -360,15 +369,21 @@ const HTML_STYLES = `
   .section { margin: .4rem 1rem; padding: .6rem .75rem; border-radius: 6px; }
   .section-pass { background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.18); }
   .section-fail { background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.18); }
+  .section-error { background: rgba(250,204,21,.06); border: 1px solid rgba(250,204,21,.18); }
   .section-title { font-weight: 700; font-size: .8rem; margin-bottom: .2rem; }
   .section-pass .section-title { color: #4ade80; }
   .section-fail .section-title { color: #f87171; }
+  .section-error .section-title { color: #facc15; }
   .section-body { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: .75rem; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
   .section-pass .section-body { color: #86efac; }
   .section-fail .section-body { color: #fca5a5; }
+  .section-error .section-body { color: #fde68a; }
+  .stat.error .num { color: #facc15; }
+  .cat-error { color: #facc15; }
+  .badge-error { background: rgba(250,204,21,.15); color: #facc15; }
   .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #222; font-size: .7rem; color: #555; text-align: center; }
   .pb { padding-bottom: .5rem; }
-  @media print { body { background: #fff; color: #111; } .section-pass .section-title, .cat-pass { color: #16a34a; } .section-fail .section-title, .cat-fail { color: #dc2626; } .section-pass .section-body { color: #166534; } .section-fail .section-body { color: #991b1b; } .stat.pass .num { color: #16a34a; } .stat.fail .num { color: #dc2626; } .project-header, .summary { background: #f3f4f6; border-color: #ddd; } .section-pass { background: #f0fdf4; border-color: #bbf7d0; } .section-fail { background: #fef2f2; border-color: #fecaca; } }
+  @media print { body { background: #fff; color: #111; } .section-pass .section-title, .cat-pass { color: #16a34a; } .section-fail .section-title, .cat-fail { color: #dc2626; } .section-error .section-title, .cat-error { color: #a16207; } .section-pass .section-body { color: #166534; } .section-fail .section-body { color: #991b1b; } .section-error .section-body { color: #854d0e; } .stat.pass .num { color: #16a34a; } .stat.fail .num { color: #dc2626; } .stat.error .num { color: #a16207; } .project-header, .summary { background: #f3f4f6; border-color: #ddd; } .section-pass { background: #f0fdf4; border-color: #bbf7d0; } .section-fail { background: #fef2f2; border-color: #fecaca; } .section-error { background: #fefce8; border-color: #fef08a; } }
 `;
 
 function buildHtml(title, projectBlocks) {
@@ -376,15 +391,21 @@ function buildHtml(title, projectBlocks) {
   const totalChecks = projectBlocks.reduce((s, p) => s + p.sections.length, 0);
   const totalThreats = projectBlocks.reduce((s, p) => s + p.threats, 0);
   const totalPassed = projectBlocks.reduce((s, p) => s + p.passed, 0);
+  const totalErrors = projectBlocks.reduce((s, p) => s + (p.errors || 0), 0);
 
   let projects = '';
   for (const p of projectBlocks) {
     const fails = p.sections.filter(s => s.hasThreat);
-    const passes = p.sections.filter(s => !s.hasThreat);
-    projects += `<div class="project"><div class="project-header">${esc(p.name)} <span class="badge ${p.threats > 0 ? 'badge-fail' : 'badge-pass'}">${p.threats > 0 ? p.threats + ' threat' + (p.threats > 1 ? 's' : '') : '\u2713 clear'}</span> <span class="badge-count">${p.sections.length} checks</span></div>`;
+    const errs = p.sections.filter(s => s.isError);
+    const passes = p.sections.filter(s => s.isPass);
+    projects += `<div class="project"><div class="project-header">${esc(p.name)} <span class="badge ${p.threats > 0 ? 'badge-fail' : 'badge-pass'}">${p.threats > 0 ? p.threats + ' threat' + (p.threats > 1 ? 's' : '') : '\u2713 clear'}</span>${errs.length > 0 ? ` <span class="badge badge-error">${errs.length} error${errs.length > 1 ? 's' : ''}</span>` : ''} <span class="badge-count">${p.sections.length} checks</span></div>`;
     if (fails.length) {
       projects += `<div class="cat cat-fail">\u26a0 Has Vulnerability (${fails.length})</div>`;
       for (const s of fails) projects += `<div class="section section-fail"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
+    }
+    if (errs.length) {
+      projects += `<div class="cat cat-error">\u26a1 Command Error (${errs.length})</div>`;
+      for (const s of errs) projects += `<div class="section section-error"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
     }
     if (passes.length) {
       projects += `<div class="cat cat-pass">\u2713 No Vulnerability (${passes.length})</div>`;
@@ -393,7 +414,7 @@ function buildHtml(title, projectBlocks) {
     projects += `<div class="pb"></div></div>`;
   }
 
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${HTML_STYLES}</style></head><body><h1>${esc(title)}</h1><div class="summary"><div class="stat pass"><div class="num">${totalPassed}</div><div class="label">Passed</div></div><div class="stat fail"><div class="num">${totalThreats}</div><div class="label">Threats</div></div><div class="stat total"><div class="num">${totalChecks}</div><div class="label">Total Checks</div></div></div>${projects}<div class="footer">Generated by KrishHub Security Scanner &middot; ${esc(date)}</div></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${HTML_STYLES}</style></head><body><h1>${esc(title)}</h1><div class="summary"><div class="stat pass"><div class="num">${totalPassed}</div><div class="label">Passed</div></div><div class="stat fail"><div class="num">${totalThreats}</div><div class="label">Threats</div></div>${totalErrors > 0 ? `<div class="stat error"><div class="num">${totalErrors}</div><div class="label">Errors</div></div>` : ''}<div class="stat total"><div class="num">${totalChecks}</div><div class="label">Total Checks</div></div></div>${projects}<div class="footer">Generated by KrishHub Security Scanner &middot; ${esc(date)}</div></body></html>`;
 }
 
 function downloadHtml(html, filename) {
@@ -414,9 +435,11 @@ function parseTestSections(output) {
     const titleLine = lines[0] || '';
     const title = titleLine.replace(/^=+\s*/, '').replace(/\s*=+$/, '').trim();
     const body = lines.slice(1).join('\n').trim();
-    const hasThreat = THREAT_KEYWORDS.some(kw => body.toUpperCase().includes(kw.toUpperCase()));
-    const isPass = !hasThreat;
-    return { title, body, hasThreat, isPass };
+    const upper = body.toUpperCase();
+    const isError = upper.includes('COMMAND FAILED');
+    const isPass = !isError && PASS_KEYWORDS.some(kw => upper.includes(kw.toUpperCase()));
+    const hasThreat = !isError && !isPass && THREAT_KEYWORDS.some(kw => upper.includes(kw.toUpperCase()));
+    return { title, body, hasThreat, isPass: !hasThreat && !isError, isError };
   });
 }
 
@@ -426,11 +449,12 @@ function TestResultPanel({ result }) {
   const sections = useMemo(() => isTestAction ? parseTestSections(result.output) : [], [result.output, isTestAction]);
   const threats = sections.filter(s => s.hasThreat);
   const passed = sections.filter(s => s.isPass);
+  const errors = sections.filter(s => s.isError);
 
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
-    const blocks = [{ name: 'Security Test', sections, threats: threats.length, passed: passed.length }];
+    const blocks = [{ name: 'Security Test', sections, threats: threats.length, passed: passed.length, errors: errors.length }];
     const html = buildHtml('Security Test Results', blocks);
     downloadHtml(html, `security-test-${new Date().toISOString().slice(0, 10)}.html`);
   };
@@ -460,10 +484,10 @@ function TestResultPanel({ result }) {
           }`}>
             {threats.length > 0 ? `${threats.length} threat${threats.length > 1 ? 's' : ''}` : 'All clear'}
           </span>
-          <span className="text-xs text-muted-foreground">{passed.length} passed · {threats.length} failed</span>
+          <span className="text-xs text-muted-foreground">{passed.length} passed · {threats.length} failed{errors.length > 0 ? ` · ${errors.length} error${errors.length > 1 ? 's' : ''}` : ''}</span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as TXT">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownload} title="Download as HTML">
             <FileDown className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPanelState(s => s === 'minimized' ? 'normal' : 'minimized')} title={panelState === 'minimized' ? 'Restore' : 'Minimize'}>
@@ -489,6 +513,19 @@ function TestResultPanel({ result }) {
                 <div key={i} className="mb-2 p-2.5 rounded-md bg-red-500/10 border border-red-500/20">
                   <p className="text-xs font-bold text-red-400 mb-1">{s.title}</p>
                   <pre className="text-xs font-mono whitespace-pre-wrap text-red-300/90">{s.body}</pre>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Errors category */}
+          {errors.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-yellow-400 mb-2 uppercase tracking-wide">⚡ Command Error ({errors.length})</p>
+              {errors.map((s, i) => (
+                <div key={i} className="mb-2 p-2.5 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-xs font-bold text-yellow-400 mb-1">{s.title}</p>
+                  <pre className="text-xs font-mono whitespace-pre-wrap text-yellow-300/90">{s.body}</pre>
                 </div>
               ))}
             </div>
