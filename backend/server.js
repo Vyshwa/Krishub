@@ -1510,6 +1510,66 @@ const server = http.createServer(async (req, res) => {
           // 13. Server info leakage
           try { parts.push('=== SERVER INFO LEAKAGE ===\n' + await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(server:|x-powered-by:)' || echo 'No server info leaked (good)'`, targetPath)); } catch (e) { parts.push('server-info: ' + e.message); }
 
+          // 14. HTTP methods check (only GET/POST/HEAD should be allowed)
+          try {
+            const methods = ['PUT', 'DELETE', 'TRACE', 'OPTIONS', 'PATCH'];
+            const methodResults = [];
+            for (const m of methods) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X ${m} "${baseUrl}/" 2>&1`, targetPath);
+              if (code === '200' || code === '204') methodResults.push(`WARN: ${m} returns ${code}`);
+            }
+            parts.push('=== HTTP METHODS CHECK ===\n' + (methodResults.length ? methodResults.join('\n') : 'HTTP methods restricted (good)'));
+          } catch (e) { parts.push('http-methods: ' + e.message); }
+
+          // 15. Open redirect check
+          try {
+            const redirectCode = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}//evil.com" 2>&1`, targetPath);
+            const redirectLoc = await safeExec(`curl -sI "${baseUrl}//evil.com" 2>&1 | grep -i '^location:' || true`, targetPath);
+            const isRedirect = (redirectCode === '301' || redirectCode === '302') && redirectLoc.toLowerCase().includes('evil.com');
+            parts.push('=== OPEN REDIRECT CHECK ===\n' + (isRedirect ? 'WARN: Possible open redirect detected' : 'No open redirects detected (good)'));
+          } catch (e) { parts.push('open-redirect: ' + e.message); }
+
+          // 16. Clickjacking protection (X-Frame-Options / CSP frame-ancestors)
+          try {
+            const headers = await safeExec(`curl -sI "${baseUrl}/" 2>&1`, targetPath);
+            const hasXFrame = /x-frame-options/i.test(headers);
+            const hasFrameAncestors = /frame-ancestors/i.test(headers);
+            parts.push('=== CLICKJACKING PROTECTION ===\n' + (hasXFrame || hasFrameAncestors ? 'X-Frame-Options or frame-ancestors present (good)' : 'WARN: No clickjacking protection headers found'));
+          } catch (e) { parts.push('clickjacking: ' + e.message); }
+
+          // 17. HSTS check
+          try {
+            const hstsHeader = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'strict-transport-security' || true`, targetPath);
+            parts.push('=== HSTS CHECK ===\n' + (hstsHeader.trim() ? hstsHeader.trim() : 'WARN: No HSTS header found'));
+          } catch (e) { parts.push('hsts: ' + e.message); }
+
+          // 18. Content-Type sniffing protection
+          try {
+            const ctHeader = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'x-content-type-options' || true`, targetPath);
+            parts.push('=== CONTENT-TYPE SNIFFING ===\n' + (ctHeader.trim() ? ctHeader.trim() : 'WARN: No X-Content-Type-Options header'));
+          } catch (e) { parts.push('content-type-sniffing: ' + e.message); }
+
+          // 19. Mixed content check (HTTP resources on HTTPS)
+          if (project.domain) {
+            try {
+              const body = await safeExec(`curl -s "https://${project.domain}/" 2>&1 | grep -oiE 'http://[^"'"'"' >]+' | head -10 || true`, targetPath);
+              parts.push('=== MIXED CONTENT CHECK ===\n' + (body.trim() ? 'WARN: HTTP resources found on HTTPS page:\n' + body.trim() : 'No mixed content detected (good)'));
+            } catch (e) { parts.push('mixed-content: ' + e.message); }
+          }
+
+          // 20. DNS zone transfer check
+          if (project.domain) {
+            try {
+              const ns = await safeExec(`dig +short NS ${project.domain} 2>/dev/null | head -1`, targetPath);
+              if (ns.trim()) {
+                const axfr = await safeExec(`dig @${ns.trim()} ${project.domain} AXFR +short 2>&1 | head -5 || true`, targetPath);
+                parts.push('=== DNS ZONE TRANSFER ===\n' + (axfr.includes('Transfer failed') || !axfr.trim() ? 'No DNS zone transfer allowed (good)' : 'WARN: DNS zone transfer may be allowed'));
+              } else {
+                parts.push('=== DNS ZONE TRANSFER ===\nNo NS records found, skipped');
+              }
+            } catch (e) { parts.push('dns-zone: ' + e.message); }
+          }
+
           logEntry.output = parts.join('\n\n');
 
         } else if (action === 'ssl-renew') {
