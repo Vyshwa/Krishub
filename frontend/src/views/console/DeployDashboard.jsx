@@ -256,21 +256,12 @@ function AllProjectsTestPanel({ results }) {
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
-    const lines = [`All Projects Security Test Results`, `${'='.repeat(60)}`, `Date: ${new Date().toISOString()}`, `Total: ${totalPassed} passed, ${totalThreats} threats`, ''];
-    for (const [label, g] of Object.entries(projectGroups)) {
-      lines.push(`\n${'#'.repeat(60)}`);
-      lines.push(`# ${label.toUpperCase()}`);
-      lines.push(`# Status: ${g.status} — ${g.threats.length} threats, ${g.passed.length} passed`);
-      lines.push(`${'#'.repeat(60)}\n`);
-      lines.push(g.output || 'No output');
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `all-projects-security-test-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const date = new Date().toISOString();
+    const blocks = Object.entries(projectGroups).map(([label, g]) => ({
+      name: label, sections: g.sections, threats: g.threats.length, passed: g.passed.length,
+    }));
+    const xml = buildXml('All Projects Security Test Results', date, '', blocks);
+    downloadXml(xml, `all-projects-security-test-${date.slice(0, 10)}.xml`);
   };
 
   return (
@@ -348,6 +339,101 @@ function AllProjectsTestPanel({ results }) {
 const THREAT_KEYWORDS = ['EXPOSED', 'WARN', 'CRITICAL', 'VULNERABLE', 'FAIL', 'HIGH', 'MODERATE', 'vulnerabilities found', 'XSS payload reflected', 'Directory listing enabled', 'missing security flags', 'server info leaked'];
 const PASS_KEYWORDS = ['(good)', 'No sensitive files exposed', 'No CORS headers for foreign origin', 'No XSS reflection', 'Directory listing disabled', 'Cookie flags OK', 'No server info leaked', '.git not exposed', 'found 0 vulnerabilities', 'No security misconfig', 'No open redirects', 'HTTP methods restricted', 'No clickjack', 'DNSSEC', 'No DNS zone', 'TLS version OK'];
 
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function buildXml(title, date, summaryAttrs, projectBlocks) {
+  const xsl = `<?xml-stylesheet type="text/xsl" href="#style"?>`;
+  const stylesheet = `
+  <xsl:stylesheet id="style" version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    <xsl:template match="/">
+      <html><head><style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f14; color: #e2e2e8; padding: 2rem; }
+        h1 { color: #a0b4ff; border-bottom: 2px solid #333; padding-bottom: .5rem; }
+        h2 { color: #8899cc; margin-top: 1.5rem; }
+        .summary { background: #1a1a24; border: 1px solid #333; border-radius: 8px; padding: 1rem; margin: 1rem 0; display: flex; gap: 2rem; }
+        .summary .stat { text-align: center; }
+        .stat .num { font-size: 1.5rem; font-weight: bold; }
+        .stat.pass .num { color: #4ade80; }
+        .stat.fail .num { color: #f87171; }
+        .project { margin: 1.5rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+        .project-header { background: #1a1a24; padding: .75rem 1rem; font-weight: bold; display: flex; align-items: center; gap: .75rem; }
+        .badge { font-size: .75rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
+        .badge-pass { background: rgba(74,222,128,.15); color: #4ade80; }
+        .badge-fail { background: rgba(248,113,113,.15); color: #f87171; }
+        .section { margin: .5rem 1rem; padding: .75rem; border-radius: 6px; }
+        .section-pass { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.2); }
+        .section-fail { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); }
+        .section-title { font-weight: bold; font-size: .85rem; margin-bottom: .25rem; }
+        .section-pass .section-title { color: #4ade80; }
+        .section-fail .section-title { color: #f87171; }
+        .section-body { font-family: 'SF Mono', 'Consolas', monospace; font-size: .8rem; white-space: pre-wrap; opacity: .85; }
+        .section-pass .section-body { color: #86efac; }
+        .section-fail .section-body { color: #fca5a5; }
+        .category-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: .5rem 1rem; }
+        .category-label.fail { color: #f87171; }
+        .category-label.pass { color: #4ade80; }
+        .footer { margin-top: 2rem; font-size: .75rem; color: #666; text-align: center; }
+      </style></head><body>
+        <h1><xsl:value-of select="/security-report/@title"/></h1>
+        <div class="summary">
+          <div class="stat pass"><div class="num"><xsl:value-of select="/security-report/summary/@passed"/></div><div>Passed</div></div>
+          <div class="stat fail"><div class="num"><xsl:value-of select="/security-report/summary/@threats"/></div><div>Threats</div></div>
+          <div class="stat"><div class="num"><xsl:value-of select="/security-report/summary/@total"/></div><div>Total Checks</div></div>
+        </div>
+        <xsl:for-each select="/security-report/project">
+          <div class="project">
+            <div class="project-header">
+              <xsl:value-of select="@name"/>
+              <xsl:choose>
+                <xsl:when test="@threats > 0"><span class="badge badge-fail"><xsl:value-of select="@threats"/> threat<xsl:if test="@threats > 1">s</xsl:if></span></xsl:when>
+                <xsl:otherwise><span class="badge badge-pass">✓ clear</span></xsl:otherwise>
+              </xsl:choose>
+            </div>
+            <xsl:if test="section[@status='fail']">
+              <div class="category-label fail">⚠ Has Vulnerability</div>
+              <xsl:for-each select="section[@status='fail']">
+                <div class="section section-fail"><div class="section-title"><xsl:value-of select="@title"/></div><div class="section-body"><xsl:value-of select="."/></div></div>
+              </xsl:for-each>
+            </xsl:if>
+            <xsl:if test="section[@status='pass']">
+              <div class="category-label pass">✓ No Vulnerability</div>
+              <xsl:for-each select="section[@status='pass']">
+                <div class="section section-pass"><div class="section-title"><xsl:value-of select="@title"/></div><div class="section-body"><xsl:value-of select="."/></div></div>
+              </xsl:for-each>
+            </xsl:if>
+          </div>
+        </xsl:for-each>
+        <div class="footer">Generated by KrishHub Security Scanner · <xsl:value-of select="/security-report/@date"/></div>
+      </body></html>
+    </xsl:template>
+  </xsl:stylesheet>`;
+
+  const totalChecks = projectBlocks.reduce((s, p) => s + p.sections.length, 0);
+  const totalThreats = projectBlocks.reduce((s, p) => s + p.threats, 0);
+  const totalPassed = projectBlocks.reduce((s, p) => s + p.passed, 0);
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n${xsl}\n<security-report title="${esc(title)}" date="${esc(date)}" ${summaryAttrs || ''}>\n${stylesheet}\n  <summary passed="${totalPassed}" threats="${totalThreats}" total="${totalChecks}"/>\n`;
+  for (const p of projectBlocks) {
+    xml += `  <project name="${esc(p.name)}" status="${p.threats > 0 ? 'fail' : 'pass'}" threats="${p.threats}" passed="${p.passed}">\n`;
+    for (const s of p.sections) {
+      xml += `    <section title="${esc(s.title)}" status="${s.hasThreat ? 'fail' : 'pass'}">${esc(s.body)}</section>\n`;
+    }
+    xml += `  </project>\n`;
+  }
+  xml += `</security-report>`;
+  return xml;
+}
+
+function downloadXml(xml, filename) {
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function parseTestSections(output) {
   if (!output) return [];
   const raw = output.split(/\n(?==== )/).filter(Boolean);
@@ -372,14 +458,10 @@ function TestResultPanel({ result }) {
   if (panelState === 'closed') return null;
 
   const handleDownload = () => {
-    const text = `Security Test Results\n${'='.repeat(60)}\nDate: ${new Date().toISOString()}\nStatus: ${result.status}\n\n${result.output || 'Done'}`;
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `security-test-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const date = new Date().toISOString();
+    const blocks = [{ name: 'Security Test', sections, threats: threats.length, passed: passed.length }];
+    const xml = buildXml('Security Test Results', date, `status="${result.status}"`, blocks);
+    downloadXml(xml, `security-test-${date.slice(0, 10)}.xml`);
   };
 
   // Non-test actions: simple output
