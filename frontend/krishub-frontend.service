@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/vyshwa/web/krishub/frontend
+WorkingDirectory=/k_live/krishub/frontend
 ExecStart=/home/vyshwa/.nvm/versions/node/v24.13.0/bin/node node_modules/.bin/next start --port 1001
 Restart=on-failure
 RestartSec=5
