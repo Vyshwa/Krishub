@@ -77,28 +77,26 @@ export function DeployDashboard() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Rocket className="h-6 w-6" /> Deployment Dashboard
         </h1>
-        <Button variant="ghost" size="icon" onClick={fetchProjects} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
-
-      {/* Test All Projects */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={testAllLoading || projects.length === 0}
-          onClick={runTestAll}
-          className="gap-1 text-xs"
-        >
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {testAllLoading ? 'Testing All...' : 'Test All Projects'}
-        </Button>
-        {testAllLoading && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <RefreshCw className="h-3 w-3 animate-spin" /> Running security tests across all projects...
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={testAllLoading || projects.length === 0}
+            onClick={runTestAll}
+            className="gap-1 text-xs"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {testAllLoading ? 'Testing All...' : 'Test All Projects'}
+          </Button>
+          {testAllLoading && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" /> Testing...
+            </span>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => window.location.reload()} title="Hard Reload">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {testAllResults && <AllProjectsTestPanel results={testAllResults} />}
