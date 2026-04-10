@@ -348,42 +348,55 @@ const PASS_KEYWORDS = ['(good)', 'No sensitive files exposed', 'No CORS headers 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const HTML_STYLES = `
-  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f0f14; color: #e2e2e8; padding: 2rem; margin: 0; }
-  h1 { color: #a0b4ff; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
-  .summary { background: #1a1a24; border: 1px solid #333; border-radius: 8px; padding: 1rem 2rem; margin: 1rem 0; display: flex; gap: 2.5rem; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f0f14; color: #e2e2e8; padding: 0; margin: 0; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+  h1 { color: #a0b4ff; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; font-size: 1.3rem; }
+  .toolbar { position: sticky; top: 0; z-index: 10; background: #13131a; border-bottom: 1px solid #333; padding: .75rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .summary { display: flex; gap: 2rem; }
   .stat { text-align: center; }
-  .stat .num { font-size: 2rem; font-weight: bold; }
-  .stat .label { font-size: .75rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .num { font-size: 1.6rem; font-weight: bold; line-height: 1.2; }
+  .stat .label { font-size: .65rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
   .stat.pass .num { color: #4ade80; }
   .stat.fail .num { color: #f87171; }
+  .stat.error .num { color: #facc15; }
   .stat.total .num { color: #a0b4ff; }
-  .project { margin: 1.5rem 0; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
-  .project-header { background: #1a1a24; padding: .75rem 1rem; font-weight: bold; font-size: 1rem; display: flex; align-items: center; gap: .75rem; }
-  .badge { font-size: .7rem; padding: 2px 10px; border-radius: 9999px; font-weight: 600; }
+  .actions { display: flex; gap: .5rem; }
+  .btn { background: #1e1e2a; color: #ccc; border: 1px solid #444; border-radius: 6px; padding: .35rem .75rem; font-size: .7rem; cursor: pointer; font-family: inherit; transition: background .15s; }
+  .btn:hover { background: #2a2a3a; color: #fff; }
+  details { margin: .75rem 0; }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: '\\25b6'; display: inline-block; width: 1rem; font-size: .65rem; transition: transform .15s; color: #666; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  .project { border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+  .project > summary { background: #1a1a24; padding: .65rem 1rem; font-weight: bold; font-size: .9rem; display: flex; align-items: center; gap: .6rem; }
+  .project-body { padding: .25rem .5rem .5rem; }
+  .badge { font-size: .65rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
   .badge-pass { background: rgba(74,222,128,.15); color: #4ade80; }
   .badge-fail { background: rgba(248,113,113,.15); color: #f87171; }
-  .badge-count { background: rgba(160,180,255,.15); color: #a0b4ff; font-size: .7rem; padding: 2px 8px; border-radius: 9999px; }
-  .cat { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .6rem 1rem .2rem; }
-  .cat-fail { color: #f87171; }
-  .cat-pass { color: #4ade80; }
-  .section { margin: .4rem 1rem; padding: .6rem .75rem; border-radius: 6px; }
-  .section-pass { background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.18); }
-  .section-fail { background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.18); }
-  .section-error { background: rgba(250,204,21,.06); border: 1px solid rgba(250,204,21,.18); }
-  .section-title { font-weight: 700; font-size: .8rem; margin-bottom: .2rem; }
-  .section-pass .section-title { color: #4ade80; }
-  .section-fail .section-title { color: #f87171; }
-  .section-error .section-title { color: #facc15; }
-  .section-body { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: .75rem; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
+  .badge-error { background: rgba(250,204,21,.15); color: #facc15; }
+  .badge-count { background: rgba(160,180,255,.12); color: #a0b4ff; font-size: .65rem; padding: 2px 8px; border-radius: 9999px; }
+  .cat { padding: .4rem .75rem; margin: .25rem 0; border-radius: 6px; }
+  .cat > summary { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: .4rem; }
+  .cat-fail > summary { color: #f87171; }
+  .cat-pass > summary { color: #4ade80; }
+  .cat-error > summary { color: #facc15; }
+  .cat-body { padding: .25rem 0; }
+  .section { margin: .3rem 0; padding: .5rem .65rem; border-radius: 6px; }
+  .section-pass { background: rgba(74,222,128,.05); border: 1px solid rgba(74,222,128,.15); }
+  .section-fail { background: rgba(248,113,113,.05); border: 1px solid rgba(248,113,113,.15); }
+  .section-error { background: rgba(250,204,21,.05); border: 1px solid rgba(250,204,21,.15); }
+  .section > summary { font-weight: 700; font-size: .78rem; }
+  .section-pass > summary { color: #4ade80; }
+  .section-fail > summary { color: #f87171; }
+  .section-error > summary { color: #facc15; }
+  .section-body { font-family: 'SF Mono','Cascadia Code','Consolas','Courier New',monospace; font-size: .72rem; white-space: pre-wrap; line-height: 1.5; word-break: break-word; padding-top: .3rem; }
   .section-pass .section-body { color: #86efac; }
   .section-fail .section-body { color: #fca5a5; }
   .section-error .section-body { color: #fde68a; }
-  .stat.error .num { color: #facc15; }
-  .cat-error { color: #facc15; }
-  .badge-error { background: rgba(250,204,21,.15); color: #facc15; }
   .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #222; font-size: .7rem; color: #555; text-align: center; }
-  .pb { padding-bottom: .5rem; }
-  @media print { body { background: #fff; color: #111; } .section-pass .section-title, .cat-pass { color: #16a34a; } .section-fail .section-title, .cat-fail { color: #dc2626; } .section-error .section-title, .cat-error { color: #a16207; } .section-pass .section-body { color: #166534; } .section-fail .section-body { color: #991b1b; } .section-error .section-body { color: #854d0e; } .stat.pass .num { color: #16a34a; } .stat.fail .num { color: #dc2626; } .stat.error .num { color: #a16207; } .project-header, .summary { background: #f3f4f6; border-color: #ddd; } .section-pass { background: #f0fdf4; border-color: #bbf7d0; } .section-fail { background: #fef2f2; border-color: #fecaca; } .section-error { background: #fefce8; border-color: #fef08a; } }
+  @media print { body { background: #fff; color: #111; } .toolbar { position: static; background: #fff; border: none; } details { break-inside: avoid; } .project > summary, .toolbar { background: #f3f4f6; } .section-pass { background: #f0fdf4; border-color: #bbf7d0; } .section-fail { background: #fef2f2; border-color: #fecaca; } .section-error { background: #fefce8; border-color: #fef08a; } .section-pass > summary, .cat-pass > summary { color: #16a34a; } .section-fail > summary, .cat-fail > summary { color: #dc2626; } .section-error > summary, .cat-error > summary { color: #a16207; } .section-pass .section-body { color: #166534; } .section-fail .section-body { color: #991b1b; } .section-error .section-body { color: #854d0e; } .stat.pass .num { color: #16a34a; } .stat.fail .num { color: #dc2626; } .stat.error .num { color: #a16207; } .btn { display: none; } }
 `;
 
 function buildHtml(title, projectBlocks) {
@@ -398,23 +411,31 @@ function buildHtml(title, projectBlocks) {
     const fails = p.sections.filter(s => s.hasThreat);
     const errs = p.sections.filter(s => s.isError);
     const passes = p.sections.filter(s => s.isPass);
-    projects += `<div class="project"><div class="project-header">${esc(p.name)} <span class="badge ${p.threats > 0 ? 'badge-fail' : 'badge-pass'}">${p.threats > 0 ? p.threats + ' threat' + (p.threats > 1 ? 's' : '') : '\u2713 clear'}</span>${errs.length > 0 ? ` <span class="badge badge-error">${errs.length} error${errs.length > 1 ? 's' : ''}</span>` : ''} <span class="badge-count">${p.sections.length} checks</span></div>`;
+
+    let inner = '';
     if (fails.length) {
-      projects += `<div class="cat cat-fail">\u26a0 Has Vulnerability (${fails.length})</div>`;
-      for (const s of fails) projects += `<div class="section section-fail"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
+      let items = '';
+      for (const s of fails) items += `<details class="section section-fail" open><summary>${esc(s.title)}</summary><div class="section-body">${esc(s.body)}</div></details>`;
+      inner += `<details class="cat cat-fail" open><summary>\\u26a0 Has Vulnerability (${fails.length})</summary><div class="cat-body">${items}</div></details>`;
     }
     if (errs.length) {
-      projects += `<div class="cat cat-error">\u26a1 Command Error (${errs.length})</div>`;
-      for (const s of errs) projects += `<div class="section section-error"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
+      let items = '';
+      for (const s of errs) items += `<details class="section section-error"><summary>${esc(s.title)}</summary><div class="section-body">${esc(s.body)}</div></details>`;
+      inner += `<details class="cat cat-error"><summary>\\u26a1 Command Error (${errs.length})</summary><div class="cat-body">${items}</div></details>`;
     }
     if (passes.length) {
-      projects += `<div class="cat cat-pass">\u2713 No Vulnerability (${passes.length})</div>`;
-      for (const s of passes) projects += `<div class="section section-pass"><div class="section-title">${esc(s.title)}</div><div class="section-body">${esc(s.body)}</div></div>`;
+      let items = '';
+      for (const s of passes) items += `<details class="section section-pass"><summary>${esc(s.title)}</summary><div class="section-body">${esc(s.body)}</div></details>`;
+      inner += `<details class="cat cat-pass"><summary>\\u2713 No Vulnerability (${passes.length})</summary><div class="cat-body">${items}</div></details>`;
     }
-    projects += `<div class="pb"></div></div>`;
+
+    const hasIssues = p.threats > 0 || errs.length > 0;
+    projects += `<details class="project"${hasIssues ? ' open' : ''}><summary>${esc(p.name)} <span class="badge ${p.threats > 0 ? 'badge-fail' : 'badge-pass'}">${p.threats > 0 ? p.threats + ' threat' + (p.threats > 1 ? 's' : '') : '\\u2713 clear'}</span>${errs.length > 0 ? ` <span class="badge badge-error">${errs.length} error${errs.length > 1 ? 's' : ''}</span>` : ''} <span class="badge-count">${p.sections.length} checks</span></summary><div class="project-body">${inner}</div></details>`;
   }
 
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${HTML_STYLES}</style></head><body><h1>${esc(title)}</h1><div class="summary"><div class="stat pass"><div class="num">${totalPassed}</div><div class="label">Passed</div></div><div class="stat fail"><div class="num">${totalThreats}</div><div class="label">Threats</div></div>${totalErrors > 0 ? `<div class="stat error"><div class="num">${totalErrors}</div><div class="label">Errors</div></div>` : ''}<div class="stat total"><div class="num">${totalChecks}</div><div class="label">Total Checks</div></div></div>${projects}<div class="footer">Generated by KrishHub Security Scanner &middot; ${esc(date)}</div></body></html>`;
+  const script = `<script>function toggleAll(open){document.querySelectorAll('details').forEach(d=>d.open=open)}<\/script>`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${HTML_STYLES}</style></head><body><div class="wrap"><h1>${esc(title)}</h1><div class="toolbar"><div class="summary"><div class="stat pass"><div class="num">${totalPassed}</div><div class="label">Passed</div></div><div class="stat fail"><div class="num">${totalThreats}</div><div class="label">Threats</div></div>${totalErrors > 0 ? `<div class="stat error"><div class="num">${totalErrors}</div><div class="label">Errors</div></div>` : ''}<div class="stat total"><div class="num">${totalChecks}</div><div class="label">Total</div></div></div><div class="actions"><button class="btn" onclick="toggleAll(true)">\\u25bc Expand All</button><button class="btn" onclick="toggleAll(false)">\\u25b6 Collapse All</button></div></div>${projects}<div class="footer">Generated by KrishHub Security Scanner &middot; ${esc(date)}</div></div>${script}</body></html>`;
 }
 
 function downloadHtml(html, filename) {
