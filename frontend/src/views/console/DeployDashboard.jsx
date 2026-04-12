@@ -10,6 +10,7 @@ export function DeployDashboard() {
   const [actionResult, setActionResult] = useState(null);
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState(null);
+  const [scanMode, setScanMode] = useState('quick');
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -34,7 +35,7 @@ export function DeployDashboard() {
       const res = await fetch(`${API}/api/deploy/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, action, target }),
+        body: JSON.stringify({ projectId, action, target, ...(action === 'test' && { scanMode }) }),
       });
       const data = await res.json();
       setActionResult({ key, ...data });
@@ -58,7 +59,7 @@ export function DeployDashboard() {
           const res = await fetch(`${API}/api/deploy/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId: proj._id, action: 'test', target }),
+            body: JSON.stringify({ projectId: proj._id, action: 'test', target, scanMode }),
           });
           const data = await res.json();
           results.push({ projectName: proj.name, target, ...data });
@@ -78,6 +79,16 @@ export function DeployDashboard() {
           <Rocket className="h-6 w-6" /> Deployment Dashboard
         </h1>
         <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-md overflow-hidden text-xs">
+            <button
+              onClick={() => setScanMode('quick')}
+              className={`px-2.5 py-1.5 transition-colors ${scanMode === 'quick' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
+            >Quick</button>
+            <button
+              onClick={() => setScanMode('deep')}
+              className={`px-2.5 py-1.5 transition-colors ${scanMode === 'deep' ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
+            >Deep</button>
+          </div>
           <Button
             size="sm"
             variant="secondary"
@@ -86,7 +97,7 @@ export function DeployDashboard() {
             className="gap-1 text-xs"
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            {testAllLoading ? 'Testing All...' : 'Test All Projects'}
+            {testAllLoading ? 'Testing All...' : `Test All (${scanMode})`}
           </Button>
           {testAllLoading && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -400,8 +411,8 @@ function AllProjectsTestPanel({ results }) {
 /* ------------------------------------------------------------------ */
 /*  Test Result Panel – collapsible, categorized, downloadable        */
 /* ------------------------------------------------------------------ */
-const THREAT_KEYWORDS = ['EXPOSED', 'WARN', 'CRITICAL', 'VULNERABLE', 'FAIL', 'HIGH', 'MODERATE', 'vulnerabilities found', 'XSS payload reflected', 'Directory listing enabled', 'missing security flags', 'server info leaked'];
-const PASS_KEYWORDS = ['(good)', 'No sensitive files exposed', 'No CORS headers for foreign origin', 'No XSS reflection', 'Directory listing disabled', 'Cookie flags OK', 'No server info leaked', '.git not exposed', 'found 0 vulnerabilities', 'No security misconfig', 'No open redirects', 'HTTP methods restricted', 'No clickjack', 'DNSSEC', 'No DNS zone', 'TLS version OK'];
+const THREAT_KEYWORDS = ['EXPOSED', 'WARN', 'CRITICAL', 'VULNERABLE', 'FAIL', 'HIGH', 'MODERATE', 'vulnerabilities found', 'XSS payload reflected', 'Directory listing enabled', 'missing security flags', 'server info leaked', 'possible SQL injection', 'mass assignment possible', 'account enumeration possible', 'authentication bypass', 'Weak password', 'Default credentials', 'No rate limiting', 'No account lockout', 'prototype pollution', 'host header', 'unsafe-inline', 'unsafe-eval', 'unrestricted', 'introspection is enabled', 'SSRF', 'XXE vulnerability', 'Template expression evaluated', 'publicly accessible', 'Stack trace', 'debug info leaked'];
+const PASS_KEYWORDS = ['(good)', 'No sensitive files exposed', 'No CORS headers for foreign origin', 'No XSS reflection', 'Directory listing disabled', 'Cookie flags OK', 'No server info leaked', '.git not exposed', 'found 0 vulnerabilities', 'No security misconfig', 'No open redirects', 'HTTP methods restricted', 'No clickjack', 'DNSSEC', 'No DNS zone', 'TLS version OK', 'No SQL injection', 'NoSQL injection payload rejected', 'No path traversal', 'No command injection', 'No CRLF injection', 'All hidden paths return 404', 'No backup files exposed', 'No debug info leaked', 'No IDE/OS files exposed', 'No common admin panels', 'Login responses are identical', 'CSP is strict', 'Cross-origin isolation', 'No weak ciphers', 'TLS 1.0 and 1.1 rejected', 'intermediate present', 'CAA records found', 'No SSRF', 'No template injection', 'No XXE', 'No prototype pollution', 'Host header not reflected', 'No API keys found', 'security.txt present', 'Lockfile integrity OK', 'No dangerous CORS', 'TRACE method disabled', 'No API playgrounds', 'HTTP/2 supported', 'Rate limiting active', 'Weak passwords rejected', 'No default credentials', 'Reset token not exposed', 'N/A', 'neutral', 'informational'];
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 

@@ -1381,6 +1381,7 @@ const server = http.createServer(async (req, res) => {
       await ensureDb();
       const raw = JSON.parse(await readBody(req));
       const { projectId, action, target } = raw;
+      const scanMode = raw.scanMode || 'quick';
       const project = await db.collection('projects').findOne({ _id: new ObjectId(projectId) });
       if (!project) return sendJSON(res, 404, { error: 'Project not found' }, {}, requestOrigin);
 
@@ -1569,6 +1570,790 @@ const server = http.createServer(async (req, res) => {
               }
             } catch (e) { parts.push('dns-zone: ' + e.message); }
           }
+
+          // ========== QUICK-MODE ADDITIONS (tests 21-40) ==========
+
+          // 21. SQL Injection probe
+          try {
+            const sqliPayload = encodeURIComponent("' OR 1=1 --");
+            const sqliResp = await safeExec(`curl -s "${baseUrl}/?id=${sqliPayload}" 2>&1 | head -50`, targetPath);
+            const sqlErrs = /mysql|syntax error|ORA-|pg_query|sqlite|unterminated|SQL/i.test(sqliResp);
+            parts.push('=== SQL INJECTION PROBE ===\n' + (sqlErrs ? 'WARN: SQL error keywords found in response — possible SQL injection' : 'No SQL injection indicators detected (good)'));
+          } catch (e) { parts.push('sqli: ' + e.message); }
+
+          // 22. NoSQL Injection probe
+          if (target === 'backend') {
+            try {
+              const nosqlResp = await safeExec(`curl -s -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '{"email":{"$gt":""},"password":{"$gt":""}}' 2>&1 | head -20`, targetPath);
+              const nosqlOk = /unauthorized|invalid|bad request|400|401|403/i.test(nosqlResp);
+              parts.push('=== NOSQL INJECTION PROBE ===\n' + (!nosqlOk && nosqlResp.trim() ? 'WARN: Server did not reject NoSQL operator payload — review input validation' : 'NoSQL injection payload rejected (good)'));
+            } catch (e) { parts.push('nosql: ' + e.message); }
+          }
+
+          // 23. Path Traversal
+          try {
+            const travPaths = ['..%2F..%2F..%2F..%2Fetc%2Fpasswd', '....//....//....//etc/passwd'];
+            const travResults = [];
+            for (const p of travPaths) {
+              const resp = await safeExec(`curl -s "${baseUrl}/${p}" 2>&1 | head -5`, targetPath);
+              if (/root:x:0/i.test(resp)) travResults.push(`CRITICAL: Path traversal successful with ${p}`);
+            }
+            parts.push('=== PATH TRAVERSAL ===\n' + (travResults.length ? travResults.join('\n') : 'No path traversal detected (good)'));
+          } catch (e) { parts.push('path-traversal: ' + e.message); }
+
+          // 24. Command Injection probe
+          try {
+            const cmdPayload = encodeURIComponent('; echo COMMAND_INJECTION_TEST');
+            const cmdResp = await safeExec(`curl -s "${baseUrl}/?cmd=${cmdPayload}" 2>&1 | head -20`, targetPath);
+            parts.push('=== COMMAND INJECTION PROBE ===\n' + (cmdResp.includes('COMMAND_INJECTION_TEST') ? 'CRITICAL: Command injection payload executed!' : 'No command injection detected (good)'));
+          } catch (e) { parts.push('cmd-injection: ' + e.message); }
+
+          // 25. CRLF / Header Injection
+          try {
+            const crlfResp = await safeExec(`curl -sI "${baseUrl}/%0d%0aX-Injected:true" 2>&1`, targetPath);
+            parts.push('=== CRLF INJECTION ===\n' + (/x-injected:\s*true/i.test(crlfResp) ? 'WARN: CRLF injection — header was injected into response' : 'No CRLF injection detected (good)'));
+          } catch (e) { parts.push('crlf: ' + e.message); }
+
+          // 26. Forced Browsing (hidden admin/debug endpoints)
+          try {
+            const hiddenPaths = ['/admin', '/debug', '/phpinfo', '/status', '/metrics', '/trace', '/actuator'];
+            const fbResults = [];
+            for (const p of hiddenPaths) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${p}" 2>&1`, targetPath);
+              if (code !== '404' && code !== '000') fbResults.push(`${p} → ${code}`);
+            }
+            parts.push('=== FORCED BROWSING ===\n' + (fbResults.length ? 'WARN: Non-404 responses on hidden paths:\n' + fbResults.join('\n') : 'All hidden paths return 404 (good)'));
+          } catch (e) { parts.push('forced-browsing: ' + e.message); }
+
+          // 27. Backup File Exposure
+          try {
+            const backupFiles = ['.env.bak', '.env.production', 'server.js.bak', 'server.js.old', 'db.sql', 'dump.sql', 'backup.zip', '.env.swp', 'web.config', '.htaccess'];
+            const bkResults = [];
+            for (const f of backupFiles) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/${f}" 2>&1`, targetPath);
+              if (code === '200') bkResults.push(`EXPOSED: ${f} (200 OK)`);
+            }
+            parts.push('=== BACKUP FILE EXPOSURE ===\n' + (bkResults.length ? bkResults.join('\n') : 'No backup files exposed (good)'));
+          } catch (e) { parts.push('backup-files: ' + e.message); }
+
+          // 28. Debug Mode / Stack Trace Leakage
+          try {
+            const debugResp = await safeExec(`curl -s "${baseUrl}/this-route-does-not-exist-debug-check" 2>&1 | head -50`, targetPath);
+            const hasTrace = /at Object\.|at Module\.|node_modules|Traceback|stack trace|SQLSTATE|Debug Mode|Debugger/i.test(debugResp);
+            parts.push('=== DEBUG MODE / STACK TRACE ===\n' + (hasTrace ? 'WARN: Stack trace or debug info leaked in error response' : 'No debug info leaked in error responses (good)'));
+          } catch (e) { parts.push('debug-mode: ' + e.message); }
+
+          // 29. robots.txt Secrets
+          try {
+            const robotsResp = await safeExec(`curl -s "${baseUrl}/robots.txt" 2>&1`, targetPath);
+            const robotsCode = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/robots.txt" 2>&1`, targetPath);
+            if (robotsCode === '200') {
+              const secretPaths = robotsResp.match(/Disallow:\s*(\S+)/gi) || [];
+              const suspicious = secretPaths.filter(p => /admin|secret|private|backup|internal|debug|api|config|dashboard/i.test(p));
+              parts.push('=== ROBOTS.TXT SECRETS ===\n' + (suspicious.length ? 'WARN: Sensitive paths disclosed in robots.txt:\n' + suspicious.join('\n') : 'robots.txt present, no sensitive paths disclosed (good)'));
+            } else {
+              parts.push('=== ROBOTS.TXT SECRETS ===\nNo robots.txt found (neutral)');
+            }
+          } catch (e) { parts.push('robots: ' + e.message); }
+
+          // 30. .DS_Store / Thumbs.db Exposure
+          try {
+            const dsFiles = ['.DS_Store', 'Thumbs.db', 'desktop.ini', '.idea/workspace.xml', '.vscode/settings.json'];
+            const dsResults = [];
+            for (const f of dsFiles) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/${f}" 2>&1`, targetPath);
+              if (code === '200') dsResults.push(`EXPOSED: ${f} (200 OK)`);
+            }
+            parts.push('=== IDE/OS FILE EXPOSURE ===\n' + (dsResults.length ? dsResults.join('\n') : 'No IDE/OS files exposed (good)'));
+          } catch (e) { parts.push('ds-store: ' + e.message); }
+
+          // 31. Exposed Admin Panels
+          try {
+            const adminPaths = ['/wp-admin', '/wp-login.php', '/phpmyadmin', '/adminer.php', '/console', '/dashboard', '/cPanel', '/webmail'];
+            const adminResults = [];
+            for (const p of adminPaths) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${p}" 2>&1`, targetPath);
+              if (code === '200' || code === '302' || code === '301') adminResults.push(`${p} → ${code}`);
+            }
+            parts.push('=== EXPOSED ADMIN PANELS ===\n' + (adminResults.length ? 'WARN: Admin panels accessible:\n' + adminResults.join('\n') : 'No common admin panels exposed (good)'));
+          } catch (e) { parts.push('admin-panels: ' + e.message); }
+
+          // 32. Account Enumeration
+          if (target === 'backend') {
+            try {
+              const validResp = await safeExec(`curl -s -w "\\n%{http_code}" -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '{"email":"admin@test.com","password":"wrong"}' 2>&1`, targetPath);
+              const fakeResp = await safeExec(`curl -s -w "\\n%{http_code}" -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '{"email":"xz9q2m@nonexistent.com","password":"wrong"}' 2>&1`, targetPath);
+              const vBody = validResp.split('\n').slice(0, -1).join('\n');
+              const fBody = fakeResp.split('\n').slice(0, -1).join('\n');
+              parts.push('=== ACCOUNT ENUMERATION ===\n' + (vBody !== fBody ? 'WARN: Different responses for valid vs invalid usernames — account enumeration possible' : 'Login responses are identical for valid/invalid users (good)'));
+            } catch (e) { parts.push('account-enum: ' + e.message); }
+          }
+
+          // 33. CSP Detailed Audit
+          try {
+            const cspHeader = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'content-security-policy' || true`, targetPath);
+            if (cspHeader.trim()) {
+              const issues = [];
+              if (/unsafe-inline/i.test(cspHeader)) issues.push("'unsafe-inline' allows inline scripts (XSS risk)");
+              if (/unsafe-eval/i.test(cspHeader)) issues.push("'unsafe-eval' allows eval() (code injection risk)");
+              if (/\*\./i.test(cspHeader) || / \* /i.test(cspHeader)) issues.push("Wildcard source allows any domain");
+              if (/data:/i.test(cspHeader)) issues.push("'data:' source can be abused for injection");
+              parts.push('=== CSP DETAILED AUDIT ===\n' + (issues.length ? 'WARN: CSP weaknesses found:\n' + issues.join('\n') : 'CSP is strict — no unsafe directives (good)') + '\nFull CSP: ' + cspHeader.trim());
+            } else {
+              parts.push('=== CSP DETAILED AUDIT ===\nWARN: No Content-Security-Policy header found');
+            }
+          } catch (e) { parts.push('csp-audit: ' + e.message); }
+
+          // 34. Permissions-Policy header
+          try {
+            const ppHeader = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(permissions-policy|feature-policy):' || true`, targetPath);
+            parts.push('=== PERMISSIONS POLICY ===\n' + (ppHeader.trim() ? ppHeader.trim() + ' (good)' : 'WARN: No Permissions-Policy header found — browser features unrestricted'));
+          } catch (e) { parts.push('permissions-policy: ' + e.message); }
+
+          // 35. Cross-Origin Isolation (COOP/COEP/CORP)
+          try {
+            const coHeaders = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(cross-origin-opener-policy|cross-origin-embedder-policy|cross-origin-resource-policy):' || true`, targetPath);
+            const present = coHeaders.trim().split('\n').filter(l => l.trim()).length;
+            parts.push('=== CROSS-ORIGIN ISOLATION ===\n' + (present >= 2 ? coHeaders.trim() + '\nCross-origin isolation headers present (good)' : 'WARN: Missing COOP/COEP/CORP headers (' + present + '/3 found)\n' + (coHeaders.trim() || 'None present')));
+          } catch (e) { parts.push('cross-origin: ' + e.message); }
+
+          // 36. Weak TLS Ciphers
+          if (project.domain) {
+            try {
+              const weakCiphers = ['RC4', 'DES', 'NULL', 'EXPORT', 'MD5'];
+              const cipherResults = [];
+              for (const c of weakCiphers) {
+                const result = await safeExec(`echo | openssl s_client -connect ${project.domain}:443 -cipher ${c} 2>&1 | grep -i 'connected\\|cipher is' || true`, targetPath);
+                if (/cipher is [^(]*[^N]/i.test(result) && !/cipher is .*(NONE|\(NONE\))/i.test(result)) cipherResults.push(`WARN: Weak cipher ${c} accepted`);
+              }
+              parts.push('=== WEAK TLS CIPHERS ===\n' + (cipherResults.length ? cipherResults.join('\n') : 'No weak ciphers accepted (good)'));
+            } catch (e) { parts.push('weak-ciphers: ' + e.message); }
+          }
+
+          // 37. TLS Version Check (reject TLS 1.0/1.1)
+          if (project.domain) {
+            try {
+              const tlsResults = [];
+              for (const ver of ['-tls1', '-tls1_1']) {
+                const result = await safeExec(`echo | openssl s_client -connect ${project.domain}:443 ${ver} 2>&1 | grep -i 'connected\\|protocol\\|error' | head -3 || true`, targetPath);
+                if (/connected/i.test(result) && !/error/i.test(result)) tlsResults.push(`WARN: ${ver.replace('-', '').toUpperCase()} still accepted`);
+              }
+              parts.push('=== TLS VERSION CHECK ===\n' + (tlsResults.length ? tlsResults.join('\n') : 'TLS 1.0 and 1.1 rejected (good)'));
+            } catch (e) { parts.push('tls-version: ' + e.message); }
+          }
+
+          // 38. Certificate Chain Validation
+          if (project.domain) {
+            try {
+              const chainOut = await safeExec(`echo | openssl s_client -connect ${project.domain}:443 -showcerts 2>/dev/null | grep -c 'BEGIN CERTIFICATE' || true`, targetPath);
+              const certCount = parseInt(chainOut) || 0;
+              parts.push('=== CERTIFICATE CHAIN ===\n' + (certCount > 1 ? `Certificate chain has ${certCount} certs — intermediate present (good)` : `WARN: Only ${certCount} certificate(s) in chain — intermediate may be missing`));
+            } catch (e) { parts.push('cert-chain: ' + e.message); }
+          }
+
+          // 39. DNS CAA Records
+          if (project.domain) {
+            try {
+              const caa = await safeExec(`dig CAA ${project.domain} +short 2>/dev/null || true`, targetPath);
+              parts.push('=== DNS CAA RECORDS ===\n' + (caa.trim() ? 'CAA records found:\n' + caa.trim() + '\n(good)' : 'WARN: No CAA records — any CA can issue certificates for this domain'));
+            } catch (e) { parts.push('dns-caa: ' + e.message); }
+          }
+
+          // 40. SPF/DKIM/DMARC Check
+          if (project.domain) {
+            try {
+              const spf = await safeExec(`dig TXT ${project.domain} +short 2>/dev/null | grep -i 'v=spf' || true`, targetPath);
+              const dmarc = await safeExec(`dig TXT _dmarc.${project.domain} +short 2>/dev/null || true`, targetPath);
+              const results = [];
+              if (spf.trim()) results.push('SPF: ' + spf.trim());
+              else results.push('WARN: No SPF record found');
+              if (dmarc.trim()) results.push('DMARC: ' + dmarc.trim());
+              else results.push('WARN: No DMARC record found');
+              parts.push('=== SPF / DMARC CHECK ===\n' + results.join('\n'));
+            } catch (e) { parts.push('spf-dmarc: ' + e.message); }
+          }
+
+          // ========== DEEP-MODE ADDITIONS (tests 41-100) ==========
+          if (scanMode === 'deep') {
+
+          // 41. Nmap Port Scan
+          if (project.domain) {
+            try {
+              const ip = await safeExec(`dig +short A ${project.domain} 2>/dev/null | head -1`, targetPath);
+              if (ip.trim()) {
+                const nmapOut = await safeExec(`nmap -sT -T4 --top-ports 100 ${ip.trim()} 2>&1 | head -40`, targetPath);
+                parts.push('=== NMAP PORT SCAN ===\n' + nmapOut);
+              } else {
+                parts.push('=== NMAP PORT SCAN ===\nCould not resolve domain IP, skipped');
+              }
+            } catch (e) { parts.push('nmap-ports: ' + e.message); }
+          }
+
+          // 42. Nmap Service Detection
+          if (port) {
+            try {
+              const svcOut = await safeExec(`nmap -sV -T4 -p ${port} localhost 2>&1 | head -20`, targetPath);
+              parts.push('=== NMAP SERVICE DETECTION ===\n' + svcOut);
+            } catch (e) { parts.push('nmap-svc: ' + e.message); }
+          }
+
+          // 43. Nmap Vuln Scripts
+          if (port) {
+            try {
+              const vulnOut = await safeExec(`nmap --script vuln -T4 -p ${port} localhost 2>&1 | head -60`, targetPath);
+              parts.push('=== NMAP VULN SCAN ===\n' + vulnOut);
+            } catch (e) { parts.push('nmap-vuln: ' + e.message); }
+          }
+
+          // 44. Nikto Web Scan
+          try {
+            const niktoOut = await safeExec(`nikto -h ${baseUrl} -Tuning 1234567890 -maxtime 120s -nointeractive 2>&1 | head -80`, targetPath);
+            parts.push('=== NIKTO WEB SCAN ===\n' + niktoOut);
+          } catch (e) { parts.push('nikto: ' + e.message); }
+
+          // 45. SSH Security Check
+          try {
+            const sshConf = await safeExec(`sudo grep -iE '^(PasswordAuthentication|PermitRootLogin|Protocol|ChallengeResponse)' /etc/ssh/sshd_config 2>&1 || true`, targetPath);
+            const issues = [];
+            if (/PasswordAuthentication\s+yes/i.test(sshConf)) issues.push('WARN: Password authentication enabled');
+            if (/PermitRootLogin\s+yes/i.test(sshConf)) issues.push('WARN: Root login permitted');
+            parts.push('=== SSH SECURITY ===\n' + sshConf.trim() + '\n' + (issues.length ? issues.join('\n') : 'SSH configuration looks secure (good)'));
+          } catch (e) { parts.push('ssh: ' + e.message); }
+
+          // 46. Firewall Rules
+          try {
+            const fwOut = await safeExec(`sudo iptables -L -n --line-numbers 2>&1 | head -30 || sudo firewall-cmd --list-all 2>&1 | head -20 || echo 'No firewall tool found'`, targetPath);
+            parts.push('=== FIREWALL RULES ===\n' + fwOut);
+          } catch (e) { parts.push('firewall: ' + e.message); }
+
+          // 47. OS Package Audit
+          try {
+            const upgradable = await safeExec(`dnf check-update --security 2>&1 | head -30 || apt list --upgradable 2>/dev/null | head -20 || true`, targetPath);
+            parts.push('=== OS PACKAGE AUDIT ===\n' + (upgradable.trim() || 'All packages up to date (good)'));
+          } catch (e) { parts.push('os-packages: ' + e.message); }
+
+          // 48. Kernel Version Check
+          try {
+            const kernel = await safeExec(`uname -r 2>&1`, targetPath);
+            const osRelease = await safeExec(`cat /etc/os-release 2>&1 | head -5 || true`, targetPath);
+            parts.push('=== KERNEL VERSION ===\n' + kernel + '\n' + osRelease);
+          } catch (e) { parts.push('kernel: ' + e.message); }
+
+          // 49. Systemd Service Hardening
+          if (service && service.type === 'systemd') {
+            try {
+              const svcFile = await safeExec(`systemctl cat ${service.name} 2>&1 || true`, targetPath);
+              const checks = [];
+              if (!/PrivateTmp\s*=\s*true/i.test(svcFile)) checks.push('WARN: PrivateTmp not enabled');
+              if (!/NoNewPrivileges\s*=\s*true/i.test(svcFile)) checks.push('WARN: NoNewPrivileges not enabled');
+              if (!/ProtectSystem/i.test(svcFile)) checks.push('WARN: ProtectSystem not set');
+              if (!/ProtectHome/i.test(svcFile)) checks.push('WARN: ProtectHome not set');
+              parts.push('=== SYSTEMD HARDENING ===\n' + (checks.length ? checks.join('\n') : 'Service has security directives enabled (good)'));
+            } catch (e) { parts.push('systemd-hardening: ' + e.message); }
+          }
+
+          // 50. SSRF Probe
+          try {
+            const ssrfPayloads = ['http://169.254.169.254/latest/meta-data/', 'http://127.0.0.1:22', 'http://[::1]/', 'http://0.0.0.0/'];
+            const ssrfResults = [];
+            for (const payload of ssrfPayloads) {
+              const resp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/?url=${encodeURIComponent(payload)}" 2>&1`, targetPath);
+              if (resp === '200') ssrfResults.push(`WARN: ${payload} returned 200 — possible SSRF`);
+            }
+            parts.push('=== SSRF PROBE ===\n' + (ssrfResults.length ? ssrfResults.join('\n') : 'No SSRF indicators detected (good)'));
+          } catch (e) { parts.push('ssrf: ' + e.message); }
+
+          // 51. GraphQL Introspection
+          try {
+            const gqlResp = await safeExec(`curl -s -X POST "${baseUrl}/graphql" -H "Content-Type: application/json" -d '{"query":"{__schema{types{name}}}"}' 2>&1 | head -20`, targetPath);
+            const hasIntrospection = /__schema|__type/i.test(gqlResp) && !/not found|cannot|error/i.test(gqlResp);
+            parts.push('=== GRAPHQL INTROSPECTION ===\n' + (hasIntrospection ? 'WARN: GraphQL introspection is enabled — disable in production' : 'No GraphQL introspection detected (good)'));
+          } catch (e) { parts.push('graphql: ' + e.message); }
+
+          // 52. API Key in Page Source
+          try {
+            const pageSource = await safeExec(`curl -s "${baseUrl}/" 2>&1 | head -200`, targetPath);
+            const keyPatterns = [
+              { name: 'Google API Key', re: /AIza[0-9A-Za-z_-]{35}/ },
+              { name: 'Stripe Secret', re: /sk_live_[0-9a-zA-Z]{24,}/ },
+              { name: 'Stripe Publishable', re: /pk_live_[0-9a-zA-Z]{24,}/ },
+              { name: 'AWS Access Key', re: /AKIA[0-9A-Z]{16}/ },
+              { name: 'Generic Secret', re: /(?:secret|apikey|api_key|token|password)\s*[:=]\s*['"][^'"]{8,}/i },
+            ];
+            const found = keyPatterns.filter(p => p.re.test(pageSource)).map(p => `WARN: ${p.name} pattern found`);
+            parts.push('=== API KEY IN SOURCE ===\n' + (found.length ? found.join('\n') : 'No API keys found in page source (good)'));
+          } catch (e) { parts.push('api-keys: ' + e.message); }
+
+          // 53. WebSocket Auth Check
+          try {
+            const wsProto = port ? 'ws' : 'wss';
+            const wsHost = port ? `localhost:${port}` : project.domain;
+            const wsResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" "${baseUrl}/ws" 2>&1`, targetPath);
+            parts.push('=== WEBSOCKET AUTH ===\n' + (wsResp === '101' ? 'WARN: WebSocket connection accepted without authentication' : `WebSocket handshake returned ${wsResp} (auth likely required — good)`));
+          } catch (e) { parts.push('ws-auth: ' + e.message); }
+
+          // 54. File Upload Test
+          if (target === 'backend') {
+            try {
+              const uploadResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/upload" -F "file=@/dev/null;filename=test.php;type=application/x-php" 2>&1`, targetPath);
+              parts.push('=== FILE UPLOAD TEST ===\n' + (uploadResp === '200' ? 'WARN: Server accepted .php file upload' : `Upload endpoint returned ${uploadResp} — dangerous extensions likely blocked (good)`));
+            } catch (e) { parts.push('file-upload: ' + e.message); }
+          }
+
+          // 55. HTTP Request Smuggling
+          try {
+            const smuggleResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -H "Content-Length: 0" -H "Transfer-Encoding: chunked" -d "0\r\n\r\nSMUGGLED" "${baseUrl}/" 2>&1`, targetPath);
+            parts.push('=== HTTP REQUEST SMUGGLING ===\n' + `CL/TE mismatch test returned ${smuggleResp} — manual verification recommended`);
+          } catch (e) { parts.push('smuggling: ' + e.message); }
+
+          // 56. Verb Tampering
+          if (target === 'backend') {
+            try {
+              const getLogin = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/api/auth/login" 2>&1`, targetPath);
+              parts.push('=== VERB TAMPERING ===\n' + (getLogin === '200' ? 'WARN: GET request to POST-only login endpoint returned 200' : `Login via GET returned ${getLogin} — methods enforced (good)`));
+            } catch (e) { parts.push('verb-tamper: ' + e.message); }
+          }
+
+          // 57. Content-Type Mismatch
+          if (target === 'backend') {
+            try {
+              const xmlResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/xml" -d '<user><email>test</email></user>' 2>&1`, targetPath);
+              parts.push('=== CONTENT-TYPE MISMATCH ===\n' + (xmlResp === '200' ? 'WARN: Server accepted XML when JSON was expected' : `XML body returned ${xmlResp} — content type validated (good)`));
+            } catch (e) { parts.push('content-mismatch: ' + e.message); }
+          }
+
+          // 58. Mass Assignment
+          if (target === 'backend') {
+            try {
+              const massResp = await safeExec(`curl -s -X POST "${baseUrl}/api/auth/register" -H "Content-Type: application/json" -d '{"email":"masstest@test.com","password":"Test1234","isAdmin":true,"role":"admin"}' 2>&1 | head -10`, targetPath);
+              const hasAdmin = /isAdmin.*true|role.*admin/i.test(massResp);
+              parts.push('=== MASS ASSIGNMENT ===\n' + (hasAdmin ? 'WARN: Server reflected admin fields — mass assignment possible' : 'Extra fields not reflected in response (good)'));
+            } catch (e) { parts.push('mass-assignment: ' + e.message); }
+          }
+
+          // 59. Excessive Data Exposure
+          if (target === 'backend') {
+            try {
+              const apiResp = await safeExec(`curl -s "${baseUrl}/api/auth/login" -X POST -H "Content-Type: application/json" -d '{"email":"test@test.com","password":"wrong"}' 2>&1 | head -20`, targetPath);
+              const sensitiveFields = /password|hash|secret|ssn|credit.?card|token.*=|private.?key/i.test(apiResp);
+              parts.push('=== EXCESSIVE DATA EXPOSURE ===\n' + (sensitiveFields ? 'WARN: Sensitive field names found in API response' : 'No sensitive fields exposed in API response (good)'));
+            } catch (e) { parts.push('data-exposure: ' + e.message); }
+          }
+
+          // 60. JWT None Algorithm
+          if (target === 'backend') {
+            try {
+              // JWT with alg:none — {"alg":"none","typ":"JWT"}.{"sub":"admin","iat":1}.
+              const noneJwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiIsImlhdCI6MX0.';
+              const jwtResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/api/auth/me" -H "Authorization: Bearer ${noneJwt}" 2>&1`, targetPath);
+              parts.push('=== JWT NONE ALGORITHM ===\n' + (jwtResp === '200' ? 'CRITICAL: Server accepts JWT with alg:none — authentication bypass!' : `alg:none JWT returned ${jwtResp} — rejected (good)`));
+            } catch (e) { parts.push('jwt-none: ' + e.message); }
+          }
+
+          // 61. JWT Expired Token
+          if (target === 'backend') {
+            try {
+              // JWT expired in 2020 — {"alg":"HS256","typ":"JWT"}.{"sub":"test","exp":1577836800}.invalid
+              const expiredJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0IiwiZXhwIjoxNTc3ODM2ODAwfQ.invalid';
+              const expResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/api/auth/me" -H "Authorization: Bearer ${expiredJwt}" 2>&1`, targetPath);
+              parts.push('=== JWT EXPIRED TOKEN ===\n' + (expResp === '200' ? 'CRITICAL: Server accepts expired JWT tokens!' : `Expired JWT returned ${expResp} — rejected (good)`));
+            } catch (e) { parts.push('jwt-expired: ' + e.message); }
+          }
+
+          // 62. Session/Cookie Timeout
+          try {
+            const cookieHeaders = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'set-cookie' || true`, targetPath);
+            if (cookieHeaders.trim()) {
+              const hasExpiry = /max-age|expires/i.test(cookieHeaders);
+              const longExpiry = /max-age\s*=\s*(\d{8,})/i.test(cookieHeaders); // > ~3 years
+              parts.push('=== SESSION TIMEOUT ===\n' + (longExpiry ? 'WARN: Cookie has extremely long max-age' : hasExpiry ? 'Cookie has expiry set (good)' : 'WARN: No max-age or expires on cookies'));
+            } else {
+              parts.push('=== SESSION TIMEOUT ===\nNo cookies set — session timeout N/A');
+            }
+          } catch (e) { parts.push('session-timeout: ' + e.message); }
+
+          // 63. Password Policy Check
+          if (target === 'backend') {
+            try {
+              const weakPasswords = ['123', 'aaa', 'password', 'a'];
+              const policyResults = [];
+              for (const pwd of weakPasswords) {
+                const resp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/register" -H "Content-Type: application/json" -d '{"email":"pwdtest${Date.now()}@test.com","password":"${pwd}","firstName":"Test","lastName":"Test"}' 2>&1`, targetPath);
+                if (resp === '200' || resp === '201') { policyResults.push(`WARN: Weak password '${pwd}' accepted`); break; }
+              }
+              parts.push('=== PASSWORD POLICY ===\n' + (policyResults.length ? policyResults.join('\n') : 'Weak passwords rejected (good)'));
+            } catch (e) { parts.push('password-policy: ' + e.message); }
+          }
+
+          // 64. Default Credentials
+          if (target === 'backend') {
+            try {
+              const defaultCreds = [
+                { u: 'admin@admin.com', p: 'admin' },
+                { u: 'root@root.com', p: 'root' },
+                { u: 'admin@admin.com', p: 'password' },
+                { u: 'test@test.com', p: 'test123' }
+              ];
+              const credResults = [];
+              for (const { u, p } of defaultCreds) {
+                const resp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '{"email":"${u}","password":"${p}"}' 2>&1`, targetPath);
+                if (resp === '200') { credResults.push(`CRITICAL: Default credentials work — ${u}:${p}`); break; }
+              }
+              parts.push('=== DEFAULT CREDENTIALS ===\n' + (credResults.length ? credResults.join('\n') : 'No default credentials accepted (good)'));
+            } catch (e) { parts.push('default-creds: ' + e.message); }
+          }
+
+          // 65. OTP/Email Bomb Rate Limit
+          if (target === 'backend') {
+            try {
+              const otpCodes = [];
+              for (let i = 0; i < 10; i++) {
+                const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/send-otp" -H "Content-Type: application/json" -d '{"email":"ratelimit@test.com"}' 2>&1`, targetPath);
+                otpCodes.push(code);
+              }
+              const has429 = otpCodes.includes('429');
+              parts.push('=== OTP FLOOD CHECK ===\n' + `Status codes: ${otpCodes.join(' ')}\n` + (has429 ? 'Rate limiting active on OTP endpoint (good)' : 'WARN: No rate limiting detected on OTP endpoint'));
+            } catch (e) { parts.push('otp-flood: ' + e.message); }
+          }
+
+          // 66. Error Handling Leak
+          try {
+            const errResp = await safeExec(`curl -s "${baseUrl}/api/this-does-not-exist-error-check" 2>&1 | head -30`, targetPath);
+            const leaks = /stack|at \w+\s*\(|node_modules|Traceback|Exception|Internal Server Error.*<pre>/i.test(errResp);
+            parts.push('=== ERROR HANDLING LEAK ===\n' + (leaks ? 'WARN: Error response contains stack trace or internal details' : 'Error responses are clean — no internal details leaked (good)'));
+          } catch (e) { parts.push('error-handling: ' + e.message); }
+
+          // 67. Monitoring Endpoint Exposure
+          try {
+            const monPaths = ['/health', '/metrics', '/env', '/actuator', '/actuator/health', '/info', '/_debug', '/server-status'];
+            const monResults = [];
+            for (const p of monPaths) {
+              const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${p}" 2>&1`, targetPath);
+              if (code === '200') monResults.push(`EXPOSED: ${p} (200)`);
+            }
+            parts.push('=== MONITORING ENDPOINTS ===\n' + (monResults.length ? 'WARN: Monitoring endpoints publicly accessible:\n' + monResults.join('\n') : 'No monitoring endpoints exposed (good)'));
+          } catch (e) { parts.push('monitoring: ' + e.message); }
+
+          // 68. Full Open Ports
+          try {
+            const allPorts = await safeExec(`ss -tlnp 2>/dev/null | head -30`, targetPath);
+            parts.push('=== OPEN PORTS (FULL) ===\n' + allPorts);
+          } catch (e) { parts.push('open-ports: ' + e.message); }
+
+          // 69. Subresource Integrity (SRI) Check
+          try {
+            const htmlSource = await safeExec(`curl -s "${baseUrl}/" 2>&1 | head -200`, targetPath);
+            const cdnScripts = htmlSource.match(/<script[^>]+src=["'][^"']*(?:cdn|unpkg|jsdelivr|cloudflare|googleapis)[^"']*["'][^>]*>/gi) || [];
+            const missingIntegrity = cdnScripts.filter(t => !/integrity=/i.test(t));
+            parts.push('=== SUBRESOURCE INTEGRITY ===\n' + (cdnScripts.length === 0 ? 'No CDN scripts found (N/A)' : missingIntegrity.length ? `WARN: ${missingIntegrity.length}/${cdnScripts.length} CDN scripts missing integrity attribute` : 'All CDN scripts have integrity attribute (good)'));
+          } catch (e) { parts.push('sri: ' + e.message); }
+
+          // 70. HSTS Preload Check
+          if (project.domain) {
+            try {
+              const hstsVal = await safeExec(`curl -sI "https://${project.domain}/" 2>&1 | grep -i 'strict-transport-security' || true`, targetPath);
+              const hasPreload = /preload/i.test(hstsVal);
+              const hasInclude = /includeSubDomains/i.test(hstsVal);
+              parts.push('=== HSTS PRELOAD ===\n' + (hasPreload && hasInclude ? 'HSTS preload directives present (good)' : `WARN: HSTS missing ${!hasPreload ? 'preload' : ''} ${!hasInclude ? 'includeSubDomains' : ''} directive(s)`));
+            } catch (e) { parts.push('hsts-preload: ' + e.message); }
+          }
+
+          // 71. Certificate Transparency (SCT)
+          if (project.domain) {
+            try {
+              const sctOut = await safeExec(`echo | openssl s_client -connect ${project.domain}:443 -ct 2>&1 | grep -iE 'SCT|certificate transparency' | head -5 || true`, targetPath);
+              parts.push('=== CERTIFICATE TRANSPARENCY ===\n' + (sctOut.trim() ? sctOut.trim() : 'No SCT information found — verify CT log inclusion'));
+            } catch (e) { parts.push('ct-log: ' + e.message); }
+          }
+
+          // 72. Reverse DNS (PTR)
+          if (project.domain) {
+            try {
+              const ip = await safeExec(`dig +short A ${project.domain} 2>/dev/null | head -1`, targetPath);
+              if (ip.trim()) {
+                const ptr = await safeExec(`dig -x ${ip.trim()} +short 2>/dev/null || true`, targetPath);
+                parts.push('=== REVERSE DNS ===\n' + `IP: ${ip.trim()}\nPTR: ${ptr.trim() || 'No PTR record found'}`);
+              }
+            } catch (e) { parts.push('reverse-dns: ' + e.message); }
+          }
+
+          // 73. IPv6 Exposure
+          try {
+            const ipv6 = await safeExec(`ss -6 -tlnp 2>/dev/null | head -15 || true`, targetPath);
+            parts.push('=== IPV6 EXPOSURE ===\n' + (ipv6.trim() ? ipv6 : 'No IPv6 listeners detected'));
+          } catch (e) { parts.push('ipv6: ' + e.message); }
+
+          // 74. Sensitive Data in URL
+          if (target === 'backend') {
+            try {
+              const getAuth = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/api/auth/login?email=test@test.com&password=test123" 2>&1`, targetPath);
+              parts.push('=== SENSITIVE DATA IN URL ===\n' + (getAuth === '200' ? 'WARN: Auth endpoint accepts credentials via GET query params' : `GET with credentials returned ${getAuth} — not processed (good)`));
+            } catch (e) { parts.push('data-in-url: ' + e.message); }
+          }
+
+          // 75. Log Injection
+          try {
+            const logPayload = encodeURIComponent('\n[CRITICAL] Fake log entry injected\n');
+            await safeExec(`curl -s -o /dev/null "${baseUrl}/?input=${logPayload}" 2>&1`, targetPath);
+            parts.push('=== LOG INJECTION ===\n' + 'Log injection payload sent — check server logs manually for injected entries (informational)');
+          } catch (e) { parts.push('log-injection: ' + e.message); }
+
+          // 76. SSTI (Server-Side Template Injection)
+          try {
+            const sstiPayloads = [
+              { p: encodeURIComponent('{{7*7}}'), expect: '49' },
+              { p: encodeURIComponent('${7*7}'), expect: '49' },
+              { p: encodeURIComponent('<%= 7*7 %>'), expect: '49' }
+            ];
+            const sstiResults = [];
+            for (const { p, expect } of sstiPayloads) {
+              const resp = await safeExec(`curl -s "${baseUrl}/?template=${p}" 2>&1 | head -20`, targetPath);
+              if (resp.includes(expect)) sstiResults.push(`WARN: Template expression evaluated — ${decodeURIComponent(p)} → ${expect}`);
+            }
+            parts.push('=== SSTI PROBE ===\n' + (sstiResults.length ? sstiResults.join('\n') : 'No template injection detected (good)'));
+          } catch (e) { parts.push('ssti: ' + e.message); }
+
+          // 77. XXE Probe
+          if (target === 'backend') {
+            try {
+              const xxePayload = '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/hostname">]><root>&xxe;</root>';
+              const xxeResp = await safeExec(`curl -s -X POST "${baseUrl}/api/upload" -H "Content-Type: application/xml" -d '${xxePayload}' 2>&1 | head -10`, targetPath);
+              const hostname = await safeExec(`cat /etc/hostname 2>&1`, targetPath);
+              parts.push('=== XXE PROBE ===\n' + (xxeResp.includes(hostname.trim()) ? 'CRITICAL: XXE vulnerability — server resolved external entity' : 'No XXE vulnerability detected (good)'));
+            } catch (e) { parts.push('xxe: ' + e.message); }
+          }
+
+          // 78. Dependency Confusion
+          try {
+            const pkgJson = await safeExec(`cat ${targetPath}/package.json 2>&1`, targetPath);
+            const pkg = JSON.parse(pkgJson);
+            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+            const scopedPrivate = Object.keys(deps).filter(d => d.startsWith('@') && !d.startsWith('@types/'));
+            parts.push('=== DEPENDENCY CONFUSION ===\n' + (scopedPrivate.length ? 'Scoped packages found (verify they exist on npm):\n' + scopedPrivate.join(', ') : 'No private-scoped packages detected — low dependency confusion risk (good)'));
+          } catch (e) { parts.push('dep-confusion: ' + e.message); }
+
+          // 79. Cookie Scope Check
+          try {
+            const cookies = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'set-cookie' || true`, targetPath);
+            if (cookies.trim()) {
+              const broad = /domain=\./i.test(cookies) || !/path=/i.test(cookies);
+              parts.push('=== COOKIE SCOPE ===\n' + cookies.trim() + '\n' + (broad ? 'WARN: Cookie has overly broad scope' : 'Cookie scope is appropriately limited (good)'));
+            } else {
+              parts.push('=== COOKIE SCOPE ===\nNo cookies set (N/A)');
+            }
+          } catch (e) { parts.push('cookie-scope: ' + e.message); }
+
+          // 80. Referrer Policy Check
+          try {
+            const refHeader = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'referrer-policy' || true`, targetPath);
+            if (refHeader.trim()) {
+              const unsafe = /unsafe-url/i.test(refHeader);
+              parts.push('=== REFERRER POLICY ===\n' + refHeader.trim() + '\n' + (unsafe ? 'WARN: Referrer-Policy is unsafe-url — leaks full URL' : '(good)'));
+            } else {
+              parts.push('=== REFERRER POLICY ===\nWARN: No Referrer-Policy header found');
+            }
+          } catch (e) { parts.push('referrer: ' + e.message); }
+
+          // 81. X-Download-Options
+          try {
+            const xdl = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'x-download-options' || true`, targetPath);
+            parts.push('=== X-DOWNLOAD-OPTIONS ===\n' + (xdl.trim() ? xdl.trim() + ' (good)' : 'WARN: No X-Download-Options header (IE file download risk)'));
+          } catch (e) { parts.push('x-download: ' + e.message); }
+
+          // 82. Cache-Control for Sensitive Pages
+          try {
+            const cacheHeaders = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -i 'cache-control' || true`, targetPath);
+            if (cacheHeaders.trim()) {
+              const hasNoStore = /no-store/i.test(cacheHeaders);
+              parts.push('=== CACHE CONTROL ===\n' + cacheHeaders.trim() + '\n' + (hasNoStore ? 'no-store present (good)' : 'WARN: no-store missing — sensitive pages may be cached'));
+            } else {
+              parts.push('=== CACHE CONTROL ===\nWARN: No Cache-Control header found');
+            }
+          } catch (e) { parts.push('cache-control: ' + e.message); }
+
+          // 83. Expect-CT Header
+          if (project.domain) {
+            try {
+              const ectHeader = await safeExec(`curl -sI "https://${project.domain}/" 2>&1 | grep -i 'expect-ct' || true`, targetPath);
+              parts.push('=== EXPECT-CT HEADER ===\n' + (ectHeader.trim() ? ectHeader.trim() + ' (good)' : 'No Expect-CT header (informational — being deprecated in favor of SCT)'));
+            } catch (e) { parts.push('expect-ct: ' + e.message); }
+          }
+
+          // 84. NEL / Report-To Headers
+          try {
+            const nelHeaders = await safeExec(`curl -sI "${baseUrl}/" 2>&1 | grep -iE '^(nel|report-to):' || true`, targetPath);
+            parts.push('=== NEL / REPORT-TO ===\n' + (nelHeaders.trim() ? nelHeaders.trim() + '\nError reporting configured (good)' : 'No NEL/Report-To headers — consider adding for error visibility (informational)'));
+          } catch (e) { parts.push('nel: ' + e.message); }
+
+          // 85. Service Worker Scope
+          try {
+            const swResp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/sw.js" 2>&1`, targetPath);
+            const swResp2 = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/service-worker.js" 2>&1`, targetPath);
+            const hasSW = swResp === '200' || swResp2 === '200';
+            parts.push('=== SERVICE WORKER ===\n' + (hasSW ? 'Service worker found — verify scope is correct and no malicious caching (informational)' : 'No service worker detected'));
+          } catch (e) { parts.push('sw: ' + e.message); }
+
+          // 86. API Versioning Exposure
+          if (target === 'backend') {
+            try {
+              const apiVersions = ['/api/v0', '/api/v1', '/api/v2', '/api/v3'];
+              const vResults = [];
+              for (const v of apiVersions) {
+                const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${v}" 2>&1`, targetPath);
+                if (code !== '404' && code !== '000') vResults.push(`${v} → ${code}`);
+              }
+              parts.push('=== API VERSIONING ===\n' + (vResults.length ? 'API versions responding:\n' + vResults.join('\n') + '\nVerify old versions are deprecated (informational)' : 'No versioned API endpoints found'));
+            } catch (e) { parts.push('api-versions: ' + e.message); }
+          }
+
+          // 87. CORS Wildcard + Credentials
+          try {
+            const corsHeaders = await safeExec(`curl -sI -H "Origin: https://evil.com" "${baseUrl}/" 2>&1 | grep -i 'access-control' || true`, targetPath);
+            const hasWildcard = /access-control-allow-origin:\s*\*/i.test(corsHeaders);
+            const hasCreds = /access-control-allow-credentials:\s*true/i.test(corsHeaders);
+            if (hasWildcard && hasCreds) {
+              parts.push('=== CORS WILDCARD + CREDENTIALS ===\nCRITICAL: Access-Control-Allow-Origin: * with Allow-Credentials: true — any site can steal authenticated data');
+            } else {
+              parts.push('=== CORS WILDCARD + CREDENTIALS ===\n' + (hasWildcard ? 'WARN: Wildcard CORS origin (safe only for public APIs)' : 'No dangerous CORS wildcard+credentials combo (good)'));
+            }
+          } catch (e) { parts.push('cors-wildcard: ' + e.message); }
+
+          // 88. Swagger/OpenAPI Exposure
+          if (target === 'backend') {
+            try {
+              const swaggerPaths = ['/swagger.json', '/api-docs', '/openapi.json', '/swagger-ui.html', '/docs', '/redoc'];
+              const swResults = [];
+              for (const p of swaggerPaths) {
+                const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${p}" 2>&1`, targetPath);
+                if (code === '200') swResults.push(`EXPOSED: ${p} (200)`);
+              }
+              parts.push('=== SWAGGER/OPENAPI EXPOSURE ===\n' + (swResults.length ? 'WARN: API documentation publicly accessible:\n' + swResults.join('\n') : 'No API docs exposed (good)'));
+            } catch (e) { parts.push('swagger: ' + e.message); }
+          }
+
+          // 89. Prototype Pollution
+          if (target === 'backend') {
+            try {
+              const protoPayloads = [
+                '{"__proto__":{"isAdmin":true}}',
+                '{"constructor":{"prototype":{"isAdmin":true}}}'
+              ];
+              const protoResults = [];
+              for (const payload of protoPayloads) {
+                const resp = await safeExec(`curl -s -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '${payload}' 2>&1 | head -10`, targetPath);
+                if (/isAdmin.*true/i.test(resp)) protoResults.push('WARN: Prototype pollution payload reflected');
+              }
+              parts.push('=== PROTOTYPE POLLUTION ===\n' + (protoResults.length ? protoResults.join('\n') : 'No prototype pollution detected (good)'));
+            } catch (e) { parts.push('proto-pollution: ' + e.message); }
+          }
+
+          // 90. Host Header Injection
+          try {
+            const hostResp = await safeExec(`curl -s -H "Host: evil.com" "${baseUrl}/" 2>&1 | head -30`, targetPath);
+            const reflected = /evil\.com/i.test(hostResp);
+            parts.push('=== HOST HEADER INJECTION ===\n' + (reflected ? 'WARN: Evil host header reflected in response — possible host header injection' : 'Host header not reflected (good)'));
+          } catch (e) { parts.push('host-injection: ' + e.message); }
+
+          // 91. Rate Limit on Registration
+          if (target === 'backend') {
+            try {
+              const regCodes = [];
+              for (let i = 0; i < 10; i++) {
+                const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/register" -H "Content-Type: application/json" -d '{"email":"ratetest${i}@test.com","password":"Test12345","firstName":"Rate","lastName":"Test"}' 2>&1`, targetPath);
+                regCodes.push(code);
+              }
+              const has429 = regCodes.includes('429');
+              parts.push('=== REGISTRATION RATE LIMIT ===\n' + `Status codes: ${regCodes.join(' ')}\n` + (has429 ? 'Rate limiting active on registration (good)' : 'WARN: No rate limiting on registration endpoint'));
+            } catch (e) { parts.push('reg-rate: ' + e.message); }
+          }
+
+          // 92. Brute Force Detection / Account Lockout
+          if (target === 'backend') {
+            try {
+              const bruteCodes = [];
+              for (let i = 0; i < 15; i++) {
+                const code = await safeExec(`curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/auth/login" -H "Content-Type: application/json" -d '{"email":"brutetest@test.com","password":"wrong${i}"}' 2>&1`, targetPath);
+                bruteCodes.push(code);
+              }
+              const has429or423 = bruteCodes.some(c => c === '429' || c === '423');
+              parts.push('=== BRUTE FORCE DETECTION ===\n' + `Status codes: ${bruteCodes.join(' ')}\n` + (has429or423 ? 'Account lockout or rate limiting detected (good)' : 'WARN: No account lockout after 15 failed attempts'));
+            } catch (e) { parts.push('brute-force: ' + e.message); }
+          }
+
+          // 93. Password Reset Token Security
+          if (target === 'backend') {
+            try {
+              const resetResp = await safeExec(`curl -s -X POST "${baseUrl}/api/auth/forgot-password" -H "Content-Type: application/json" -d '{"email":"resettest@test.com"}' 2>&1 | head -10`, targetPath);
+              const tokenInResp = /token|reset.*link|http/i.test(resetResp);
+              parts.push('=== PASSWORD RESET TOKEN ===\n' + (tokenInResp ? 'WARN: Reset token or link exposed in API response — should be sent via email only' : 'Reset token not exposed in response (good)'));
+            } catch (e) { parts.push('reset-token: ' + e.message); }
+          }
+
+          // 94. security.txt (RFC 9116)
+          try {
+            const secTxt = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}/.well-known/security.txt" 2>&1`, targetPath);
+            parts.push('=== SECURITY.TXT ===\n' + (secTxt === '200' ? 'security.txt present (good — RFC 9116)' : 'WARN: No /.well-known/security.txt — consider adding per RFC 9116'));
+          } catch (e) { parts.push('security-txt: ' + e.message); }
+
+          // 95. Lockfile Integrity
+          try {
+            const hasLockfile = await safeExec(`test -f ${targetPath}/package-lock.json && echo 'yes' || echo 'no'`, targetPath);
+            if (hasLockfile.trim() === 'yes') {
+              const lockCheck = await safeExec(`cd ${targetPath} && npm ls --all 2>&1 | tail -5 || true`, targetPath);
+              const hasMismatch = /WARN|ERR|missing|invalid|extraneous/i.test(lockCheck);
+              parts.push('=== LOCKFILE INTEGRITY ===\n' + (hasMismatch ? 'WARN: Lockfile mismatches detected:\n' + lockCheck : 'Lockfile integrity OK (good)'));
+            } else {
+              parts.push('=== LOCKFILE INTEGRITY ===\nWARN: No package-lock.json found — builds may not be reproducible');
+            }
+          } catch (e) { parts.push('lockfile: ' + e.message); }
+
+          // 96. MIME Type Confusion (upload .html as .jpg)
+          if (target === 'backend') {
+            try {
+              const mimeResp = await safeExec(`echo '<html><script>alert(1)</script></html>' | curl -s -o /dev/null -w "%{http_code}" -X POST "${baseUrl}/api/upload" -F "file=@-;filename=test.html.jpg;type=image/jpeg" 2>&1`, targetPath);
+              parts.push('=== MIME TYPE CONFUSION ===\n' + (mimeResp === '200' ? 'WARN: Server accepted HTML disguised as JPG — verify content-type serving' : `Upload returned ${mimeResp} — likely rejected (good)`));
+            } catch (e) { parts.push('mime-confusion: ' + e.message); }
+          }
+
+          // 97. Public S3/Storage Bucket References
+          try {
+            const srcPage = await safeExec(`curl -s "${baseUrl}/" 2>&1 | head -300`, targetPath);
+            const bucketPatterns = [
+              /https?:\/\/[a-z0-9.-]+\.s3[.-]amazonaws\.com/gi,
+              /https?:\/\/storage\.googleapis\.com\/[a-z0-9._-]+/gi,
+              /https?:\/\/[a-z0-9]+\.blob\.core\.windows\.net/gi
+            ];
+            const found = bucketPatterns.flatMap(re => (srcPage.match(re) || []));
+            parts.push('=== PUBLIC STORAGE BUCKETS ===\n' + (found.length ? 'Cloud storage URLs found in source (verify access controls):\n' + [...new Set(found)].join('\n') : 'No cloud storage bucket URLs in page source (good)'));
+          } catch (e) { parts.push('buckets: ' + e.message); }
+
+          // 98. TRACE Method (XST)
+          try {
+            const traceResp = await safeExec(`curl -s -X TRACE "${baseUrl}/" -H "X-Custom: test" 2>&1 | head -10`, targetPath);
+            const xst = /TRACE|X-Custom.*test/i.test(traceResp);
+            parts.push('=== TRACE METHOD (XST) ===\n' + (xst ? 'WARN: TRACE method enabled — Cross-Site Tracing possible' : 'TRACE method disabled (good)'));
+          } catch (e) { parts.push('trace-xst: ' + e.message); }
+
+          // 99. Open API/GraphQL Playground
+          try {
+            const playgrounds = ['/graphql', '/playground', '/graphiql', '/altair'];
+            const pgResults = [];
+            for (const p of playgrounds) {
+              const resp = await safeExec(`curl -s -o /dev/null -w "%{http_code}" "${baseUrl}${p}" 2>&1`, targetPath);
+              if (resp === '200') pgResults.push(`${p} → 200`);
+            }
+            parts.push('=== API PLAYGROUND EXPOSURE ===\n' + (pgResults.length ? 'WARN: API playgrounds publicly accessible:\n' + pgResults.join('\n') : 'No API playgrounds exposed (good)'));
+          } catch (e) { parts.push('playground: ' + e.message); }
+
+          // 100. HTTP/2 and Compression Check
+          try {
+            const h2Check = await safeExec(`curl -sI --http2 "${baseUrl}/" 2>&1 | head -3`, targetPath);
+            const hasH2 = /HTTP\/2/i.test(h2Check);
+            const compCheck = await safeExec(`curl -sI -H "Accept-Encoding: gzip, br" "${baseUrl}/" 2>&1 | grep -i 'content-encoding' || true`, targetPath);
+            parts.push('=== HTTP/2 & COMPRESSION ===\n' + (hasH2 ? 'HTTP/2 supported (good)' : 'HTTP/1.1 only — consider enabling HTTP/2') + '\n' + (compCheck.trim() ? compCheck.trim() + ' — compression enabled (good)' : 'WARN: No compression detected'));
+          } catch (e) { parts.push('http2: ' + e.message); }
+
+          } // end deep-mode
 
           logEntry.output = parts.join('\n\n');
 

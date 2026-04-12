@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KrishHub — Security Test Suite Documentation (100 Tests)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f0f14;color:#e2e2e8;line-height:1.6}
+  .wrap{max-width:980px;margin:0 auto;padding:2rem}
+  h1{color:#a0b4ff;font-size:1.6rem;border-bottom:2px solid #333;padding-bottom:.5rem;margin-bottom:.5rem}
+  .subtitle{color:#888;font-size:.85rem;margin-bottom:2rem}
+  h2{color:#c4b5fd;font-size:1.1rem;margin:2rem 0 .75rem;padding-left:.5rem;border-left:3px solid #c4b5fd}
+  .toc{background:#1a1a24;border:1px solid #333;border-radius:8px;padding:1rem 1.5rem;margin-bottom:2rem}
+  .toc summary{font-weight:700;font-size:.9rem;color:#a0b4ff;cursor:pointer}
+  .toc ol{margin-top:.75rem;padding-left:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.2rem .5rem}
+  .toc li{font-size:.72rem;color:#999}
+  .toc a{color:#8bb4ff;text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .stats{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+  .stat-card{background:#1a1a24;border:1px solid #333;border-radius:8px;padding:.75rem 1.25rem;text-align:center;flex:1;min-width:90px}
+  .stat-card .num{font-size:1.8rem;font-weight:800;line-height:1.2}
+  .stat-card .label{font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:#888}
+  .stat-card.blue .num{color:#a0b4ff}.stat-card.green .num{color:#4ade80}.stat-card.red .num{color:#f87171}.stat-card.yellow .num{color:#facc15}.stat-card.purple .num{color:#c4b5fd}.stat-card.cyan .num{color:#22d3ee}
+  .test-card{background:#1a1a24;border:1px solid #333;border-radius:8px;margin-bottom:.75rem;overflow:hidden}
+  .test-card>summary{padding:.65rem .9rem;font-weight:600;font-size:.82rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;list-style:none}
+  .test-card>summary::-webkit-details-marker{display:none}
+  .test-card>summary::before{content:'\25b6';font-size:.55rem;color:#666;display:inline-block;width:.7rem;transition:transform .15s}
+  .test-card[open]>summary::before{transform:rotate(90deg)}
+  .badge{font-size:.55rem;padding:2px 7px;border-radius:999px;font-weight:600}
+  .badge-infra{background:rgba(160,180,255,.15);color:#a0b4ff}
+  .badge-header{background:rgba(196,181,253,.15);color:#c4b5fd}
+  .badge-app{background:rgba(74,222,128,.15);color:#4ade80}
+  .badge-network{background:rgba(250,204,21,.15);color:#facc15}
+  .badge-recon{background:rgba(251,146,60,.15);color:#fb923c}
+  .test-body{padding:0 .9rem .85rem}
+  .field{margin-bottom:.5rem}.field-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.1rem}.field-value{font-size:.78rem;color:#ccc}
+  code{font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:.74rem;background:#0d0d12;padding:2px 5px;border-radius:4px;color:#93c5fd}
+  pre{background:#0d0d12;border:1px solid #252530;border-radius:6px;padding:.6rem;font-size:.68rem;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#a1a1aa;line-height:1.5;margin-top:.3rem}
+  .pass-kw{color:#4ade80}.fail-kw{color:#f87171}
+  .section-divider{border:0;border-top:1px solid #252530;margin:.5rem 0}
+  table{width:100%;border-collapse:collapse;font-size:.74rem;margin:.5rem 0}
+  th{text-align:left;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:#888;padding:.35rem .5rem;border-bottom:1px solid #333}
+  td{padding:.35rem .5rem;border-bottom:1px solid #1e1e28;vertical-align:top}
+  td:first-child{color:#93c5fd;font-family:monospace;white-space:nowrap}
+  .owasp{font-size:.6rem;display:inline-block;padding:1px 5px;border-radius:4px;background:rgba(248,113,113,.12);color:#fca5a5}
+  .arch-box{background:#13131a;border:1px solid #333;border-radius:8px;padding:1rem;margin:.75rem 0}
+  .arch-box h4{font-size:.75rem;color:#a0b4ff;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem}
+  .arch-list{list-style:none;padding:0}
+  .arch-list li{font-size:.78rem;padding:.2rem 0;color:#aaa}
+  .arch-list li::before{content:'→';color:#555;margin-right:.5rem}
+  .mode-legend{display:flex;gap:1.5rem;margin:1rem 0;font-size:.78rem}
+  .mode-legend span{display:flex;align-items:center;gap:.4rem}
+  .mode-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .mode-dot.quick{background:#4ade80}.mode-dot.deep{background:#c084fc}
+  .footer{margin-top:3rem;padding-top:1rem;border-top:1px solid #252530;font-size:.7rem;color:#444;text-align:center}
+  @media print{body{background:#fff;color:#111}.test-card,.toc,.stat-card,.arch-box{background:#f8f9fa;border-color:#ddd}h1,.toc summary{color:#1e40af}h2{color:#6d28d9;border-color:#6d28d9}code{background:#f1f5f9;color:#1e40af}pre{background:#f1f5f9;border-color:#e2e8f0;color:#334155}.pass-kw{color:#16a34a}.fail-kw{color:#dc2626}}
+</style>
+<script>
+function toggleAll(o){document.querySelectorAll('details.test-card').forEach(d=>d.open=o)}
+function filterMode(m){document.querySelectorAll('details.test-card').forEach(d=>{d.style.display=m==='all'?'':d.dataset.mode===m?'':'none'})}
+</script>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🛡️ KrishHub — Security Test Suite Documentation</h1>
+<p class="subtitle">Comprehensive breakdown of all <strong>100 automated security test cases</strong> executed via the Deploy Dashboard.<br>
+Scan Modes: <strong>Quick Scan</strong> (tests 1–40 ~30s) · <strong>Deep Scan</strong> (tests 1–100 ~5min)<br>
+Generated: 12 April 2026 · Backend: <code>backend/server.js</code> · Frontend: <code>DeployDashboard.jsx</code></p>
+
+<div class="stats">
+  <div class="stat-card blue"><div class="num">100</div><div class="label">Total Tests</div></div>
+  <div class="stat-card green"><div class="num">40</div><div class="label">Quick Mode</div></div>
+  <div class="stat-card purple"><div class="num">60</div><div class="label">Deep Mode</div></div>
+  <div class="stat-card yellow"><div class="num">5</div><div class="label">Categories</div></div>
+  <div class="stat-card red"><div class="num">9</div><div class="label">OWASP Coverage</div></div>
+  <div class="stat-card cyan"><div class="num">3</div><div class="label">Result States</div></div>
+</div>
+
+<div class="mode-legend">
+  <span><span class="mode-dot quick"></span> Quick Scan (1–40)</span>
+  <span><span class="mode-dot deep"></span> Deep Scan only (41–100)</span>
+</div>
+
+<h2 id="arch">Architecture Overview</h2>
+<div class="arch-box">
+  <h4>How Security Tests Run</h4>
+  <ol class="arch-list">
+    <li><strong>Trigger:</strong> User clicks <code>Test</code> (single) or <code>Test All</code> (batch) with Quick/Deep toggle</li>
+    <li><strong>Mode:</strong> <code>scanMode</code> = 'quick' (tests 1–40) or 'deep' (tests 1–100)</li>
+    <li><strong>Transport:</strong> Frontend sends <code>{ action: "test", projectId, target, scanMode }</code> via HTTP POST</li>
+    <li><strong>Execution:</strong> Backend runs tests sequentially via <code>safeExec()</code> (120s timeout per command)</li>
+    <li><strong>Tools:</strong> curl · openssl · dig · ss · npm · nmap (deep) · nikto (deep)</li>
+    <li><strong>Output:</strong> Results joined with <code>=== SECTION_NAME ===</code> delimiters</li>
+    <li><strong>Parsing:</strong> Frontend <code>parseTestSections()</code> splits by <code>=== </code> markers</li>
+    <li><strong>Classification:</strong> Each section → <span class="fail-kw">Threat</span>, <span class="pass-kw">Pass</span>, or <span style="color:#facc15">Error</span> via keyword matching</li>
+    <li><strong>Display:</strong> Collapsible <code>&lt;Disclosure&gt;</code> panels grouped by category with color coding</li>
+    <li><strong>Export:</strong> One-click download as self-contained HTML with expand/collapse</li>
+  </ol>
+</div>
+
+<details class="toc" open>
+  <summary>📋 Table of Contents — All 100 Test Cases</summary>
+  <ol>
+    <li><a href="#t1">NPM Audit</a></li>
+    <li><a href="#t2">Outdated Packages</a></li>
+    <li><a href="#t3">Security Headers Scan</a></li>
+    <li><a href="#t4">SSL/TLS Certificate Check</a></li>
+    <li><a href="#t5">Port Check</a></li>
+    <li><a href="#t6">Sensitive File Exposure</a></li>
+    <li><a href="#t7">CORS Misconfiguration</a></li>
+    <li><a href="#t8">Rate Limiting</a></li>
+    <li><a href="#t9">Directory Listing</a></li>
+    <li><a href="#t10">XSS Reflection</a></li>
+    <li><a href="#t11">Git Exposure</a></li>
+    <li><a href="#t12">Cookie Security</a></li>
+    <li><a href="#t13">Server Info Leakage</a></li>
+    <li><a href="#t14">HTTP Methods Check</a></li>
+    <li><a href="#t15">Open Redirect</a></li>
+    <li><a href="#t16">Clickjacking Protection</a></li>
+    <li><a href="#t17">HSTS Check</a></li>
+    <li><a href="#t18">Content-Type Sniffing</a></li>
+    <li><a href="#t19">Mixed Content</a></li>
+    <li><a href="#t20">DNS Zone Transfer</a></li>
+    <li><a href="#t21">SQL Injection Probe</a></li>
+    <li><a href="#t22">NoSQL Injection Probe</a></li>
+    <li><a href="#t23">Path Traversal</a></li>
+    <li><a href="#t24">Command Injection Probe</a></li>
+    <li><a href="#t25">CRLF / Header Injection</a></li>
+    <li><a href="#t26">Forced Browsing</a></li>
+    <li><a href="#t27">Backup File Exposure</a></li>
+    <li><a href="#t28">Debug Mode / Stack Trace</a></li>
+    <li><a href="#t29">Robots.txt Secrets</a></li>
+    <li><a href="#t30">IDE/OS File Exposure</a></li>
+    <li><a href="#t31">Exposed Admin Panels</a></li>
+    <li><a href="#t32">Account Enumeration</a></li>
+    <li><a href="#t33">CSP Detailed Audit</a></li>
+    <li><a href="#t34">Permissions Policy</a></li>
+    <li><a href="#t35">Cross-Origin Isolation</a></li>
+    <li><a href="#t36">Weak TLS Ciphers</a></li>
+    <li><a href="#t37">TLS Version Check</a></li>
+    <li><a href="#t38">Certificate Chain</a></li>
+    <li><a href="#t39">DNS CAA Records</a></li>
+    <li><a href="#t40">SPF / DMARC Check</a></li>
+    <li><a href="#t41">Nmap Port Scan</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t42">Nmap Service Detection</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t43">Nmap Vuln Scripts</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t44">Nikto Web Scan</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t45">SSH Security</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t46">Firewall Rules</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t47">OS Package Audit</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t48">Kernel Version</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t49">Systemd Hardening</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t50">SSRF Probe</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t51">GraphQL Introspection</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t52">API Key in Source</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t53">WebSocket Auth</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t54">File Upload Test</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t55">HTTP Request Smuggling</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t56">Verb Tampering</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t57">Content-Type Mismatch</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t58">Mass Assignment</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t59">Excessive Data Exposure</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t60">JWT None Algorithm</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t61">JWT Expired Token</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t62">Session/Cookie Timeout</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t63">Password Policy</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t64">Default Credentials</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t65">OTP Flood Check</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t66">Error Handling Leak</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t67">Monitoring Endpoints</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t68">Open Ports (Full)</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t69">Subresource Integrity</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t70">HSTS Preload</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t71">Certificate Transparency</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t72">Reverse DNS (PTR)</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t73">IPv6 Exposure</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t74">Sensitive Data in URL</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t75">Log Injection</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t76">SSTI Probe</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t77">XXE Probe</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t78">Dependency Confusion</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t79">Cookie Scope</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t80">Referrer Policy</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t81">X-Download-Options</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t82">Cache Control</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t83">Expect-CT Header</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t84">NEL / Report-To</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t85">Service Worker</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t86">API Versioning</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t87">CORS Wildcard + Credentials</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t88">Swagger/OpenAPI Exposure</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t89">Prototype Pollution</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t90">Host Header Injection</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t91">Registration Rate Limit</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t92">Brute Force Detection</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t93">Password Reset Token</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t94">Security.txt (RFC 9116)</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t95">Lockfile Integrity</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t96">MIME Type Confusion</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t97">Public Storage Buckets</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t98">TRACE Method (XST)</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t99">API Playground Exposure</a> <small style="color:#666">(deep)</small></li>
+    <li><a href="#t100">HTTP/2 &amp; Compression</a> <small style="color:#666">(deep)</small></li>
+  </ol>
+</details>
+
+<div style="margin-bottom:.75rem;display:flex;gap:.4rem;flex-wrap:wrap">
+  <button onclick="toggleAll(true)" style="background:#1e1e2a;color:#ccc;border:1px solid #444;border-radius:6px;padding:.35rem .75rem;font-size:.7rem;cursor:pointer;font-family:inherit">▼ Expand All</button>
+  <button onclick="toggleAll(false)" style="background:#1e1e2a;color:#ccc;border:1px solid #444;border-radius:6px;padding:.35rem .75rem;font-size:.7rem;cursor:pointer;font-family:inherit">▶ Collapse All</button>
+  <button onclick="filterMode('all')" style="background:#1e1e2a;color:#ccc;border:1px solid #444;border-radius:6px;padding:.35rem .75rem;font-size:.7rem;cursor:pointer;font-family:inherit">All</button>
+  <button onclick="filterMode('quick')" style="background:#1e1e2a;color:#4ade80;border:1px solid #333;border-radius:6px;padding:.35rem .75rem;font-size:.7rem;cursor:pointer;font-family:inherit">Quick Only</button>
+  <button onclick="filterMode('deep')" style="background:#1e1e2a;color:#c084fc;border:1px solid #333;border-radius:6px;padding:.35rem .75rem;font-size:.7rem;cursor:pointer;font-family:inherit">Deep Only</button>
+</div>
+
+<details class="test-card" id="t1" data-mode="quick" open>
+  <summary>#1 — NPM Audit <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NPM AUDIT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Scans all production dependencies for known vulnerabilities in the npm registry.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>npm audit --production --audit-level=moderate 2&gt;&amp;1 || true</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">found 0 vulnerabilities</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">VULNERABLE, HIGH, MODERATE</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Run npm audit fix or manually update vulnerable packages.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t2" data-mode="quick" open>
+  <summary>#2 — Outdated Packages <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== OUTDATED PACKAGES ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Lists all packages with newer versions available, highlighting potential security patches missed.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>npm outdated --long 2&gt;&amp;1 || true</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">All up to date</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Run npm update or pin specific versions.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t3" data-mode="quick" open>
+  <summary>#3 — Security Headers Scan <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SECURITY HEADERS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for essential HTTP security headers (HSTS, CSP, X-Frame-Options, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI &quot;${baseUrl}/&quot; | grep security-related-headers</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Headers present</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: missing headers</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add missing headers in nginx config.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t4" data-mode="quick">
+  <summary>#4 — SSL/TLS Certificate Check <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SSL/TLS CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Validates SSL certificate dates, subject, and issuer. Only runs when domain is configured.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>openssl s_client + openssl x509 -noout -dates -subject -issuer</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Certificate valid</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">SSL check failed</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Renew SSL certificate via certbot.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t5" data-mode="quick">
+  <summary>#5 — Port Check <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PORT CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Verifies the configured port is actually listening using ss.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>ss -tlnp | grep &quot;:PORT &quot;</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>port</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Port listening</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Port not listening</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Start the service or check port configuration.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t6" data-mode="quick">
+  <summary>#6 — Sensitive File Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SENSITIVE FILE EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes for common sensitive files (.env, .git/config, wp-config.php, etc.) via HTTP 200 responses.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; for each sensitive file</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No sensitive files exposed</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">EXPOSED</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Block sensitive files in nginx location rules.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t7" data-mode="quick">
+  <summary>#7 — CORS Misconfiguration <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CORS CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends request with Origin: evil.com to check if Access-Control headers are returned.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI -H &quot;Origin: https://evil.com&quot; &quot;${baseUrl}/&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No CORS headers for foreign origin (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Configure CORS to only allow trusted origins.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t8" data-mode="quick">
+  <summary>#8 — Rate Limiting <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== RATE LIMIT CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends 20 rapid requests to login endpoint checking for 429 status codes.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>for i in $(seq 1 20); do curl POST /api/auth/login; done</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">429 detected</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">No rate limiting</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Implement rate limiting middleware.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t9" data-mode="quick">
+  <summary>#9 — Directory Listing <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DIRECTORY LISTING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if server exposes directory contents (&quot;Index of /&quot;).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/&quot; | grep &quot;index of /&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Directory listing disabled (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Directory listing enabled</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Disable autoindex in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t10" data-mode="quick">
+  <summary>#10 — XSS Reflection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== XSS REFLECTION CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Injects &lt;script&gt; tag and checks if it is reflected in the response body.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s with script tag payload | grep -c script</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No XSS reflection detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: XSS payload reflected</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Sanitize all user input and enable CSP.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t11" data-mode="quick">
+  <summary>#11 — Git Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== GIT EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if /.git/HEAD is accessible (HTTP 200), exposing source code history.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; &quot;${baseUrl}/.git/HEAD&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">.git not exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: .git directory exposed!</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Block .git in nginx with deny all.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t12" data-mode="quick">
+  <summary>#12 — Cookie Security <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== COOKIE SECURITY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Examines Set-Cookie headers for Secure, HttpOnly, and SameSite flags.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep set-cookie | check flags</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Cookie flags OK</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Cookies missing security flags</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set Secure; HttpOnly; SameSite=Strict on all cookies.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t13" data-mode="quick">
+  <summary>#13 — Server Info Leakage <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SERVER INFO LEAKAGE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if Server: or X-Powered-By: headers expose technology stack.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep -iE &quot;^(server:|x-powered-by:)&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No server info leaked (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">server info leaked</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Hide server tokens in nginx (server_tokens off).</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t14" data-mode="quick">
+  <summary>#14 — HTTP Methods Check <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HTTP METHODS CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Tests if dangerous HTTP methods (PUT, DELETE, TRACE, PATCH) return 200/204.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -X METHOD -o /dev/null -w &quot;%{http_code}&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">HTTP methods restricted (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Restrict allowed methods in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t15" data-mode="quick">
+  <summary>#15 — Open Redirect <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== OPEN REDIRECT CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Tests if server redirects to //evil.com which could be used for phishing.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI &quot;${baseUrl}//evil.com&quot; check redirect</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No open redirects detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Possible open redirect</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate redirect destinations server-side.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t16" data-mode="quick">
+  <summary>#16 — Clickjacking Protection <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CLICKJACKING PROTECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for X-Frame-Options or CSP frame-ancestors to prevent iframe embedding.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep x-frame-options or frame-ancestors</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Protection present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No clickjacking protection</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add X-Frame-Options: DENY header.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t17" data-mode="quick">
+  <summary>#17 — HSTS Check <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HSTS CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Verifies Strict-Transport-Security header is present.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI https://domain | grep strict-transport-security</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">HSTS header present</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No HSTS header</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add HSTS header with long max-age.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t18" data-mode="quick">
+  <summary>#18 — Content-Type Sniffing <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CONTENT-TYPE SNIFFING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for X-Content-Type-Options: nosniff header.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep x-content-type-options</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No X-Content-Type-Options header</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add X-Content-Type-Options: nosniff.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t19" data-mode="quick">
+  <summary>#19 — Mixed Content <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== MIXED CONTENT CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Scans HTTPS page source for http:// resource references.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s https://domain | grep -oE &quot;http://[^'\&quot;]*&quot;</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No mixed content detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: HTTP resources found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Update all references to HTTPS.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t20" data-mode="quick">
+  <summary>#20 — DNS Zone Transfer <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DNS ZONE TRANSFER ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts AXFR zone transfer against nameservers to check for DNS data leakage.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>dig AXFR domain @ns</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No DNS zone transfer allowed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: DNS zone transfer may be allowed</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Restrict AXFR in DNS server config.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t21" data-mode="quick">
+  <summary>#21 — SQL Injection Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SQL INJECTION PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends classic SQL injection payload and checks for database error keywords in response.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/?id=' OR 1=1 --&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No SQL injection indicators detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: SQL error keywords found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Use parameterized queries, never concatenate user input.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t22" data-mode="quick">
+  <summary>#22 — NoSQL Injection Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NOSQL INJECTION PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends MongoDB operator payload {$gt:&quot;&quot;} to login and checks if server rejects it.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -X POST login with NoSQL operator payload</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">NoSQL injection payload rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Server did not reject NoSQL operator</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate input types, reject objects where strings expected.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t23" data-mode="quick">
+  <summary>#23 — Path Traversal <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PATH TRAVERSAL ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts to read /etc/passwd via directory traversal payloads.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/..%2F..%2Fetc%2Fpasswd&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No path traversal detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Path traversal successful</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Normalize paths, block traversal sequences.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t24" data-mode="quick">
+  <summary>#24 — Command Injection Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== COMMAND INJECTION PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends shell command payload and checks if output appears in response.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/?cmd=; echo COMMAND_INJECTION_TEST&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No command injection detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Command injection payload executed!</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Never pass user input to shell commands.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t25" data-mode="quick">
+  <summary>#25 — CRLF / Header Injection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CRLF INJECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Injects CRLF characters to check if custom headers can be added to the response.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI &quot;${baseUrl}/%0d%0aX-Injected:true&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No CRLF injection detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: CRLF injection — header was injected</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Sanitize URL-encoded newlines in request handling.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t26" data-mode="quick">
+  <summary>#26 — Forced Browsing <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== FORCED BROWSING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes hidden endpoints (/admin, /debug, /phpinfo, /metrics, etc.) for non-404 responses.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; for hidden paths</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">All hidden paths return 404 (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Non-404 responses on hidden paths</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Return 404 or require auth for admin/debug paths.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t27" data-mode="quick">
+  <summary>#27 — Backup File Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== BACKUP FILE EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for accessible backup files (.env.bak, db.sql, .swp, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; for backup files</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No backup files exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">EXPOSED</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Block backup file extensions in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t28" data-mode="quick">
+  <summary>#28 — Debug Mode / Stack Trace <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DEBUG MODE / STACK TRACE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Requests a non-existent route and checks if stack trace or debug info leaks.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/non-existent-route&quot; | check for stack traces</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No debug info leaked (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Stack trace or debug info leaked</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Disable debug mode in production; use generic error pages.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t29" data-mode="quick">
+  <summary>#29 — Robots.txt Secrets <span class="badge badge-recon">Reconnaissance</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== ROBOTS.TXT SECRETS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Parses robots.txt Disallow entries for sensitive path names (admin, secret, backup, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -s &quot;${baseUrl}/robots.txt&quot; | parse Disallow entries</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No sensitive paths disclosed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Sensitive paths disclosed in robots.txt</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Remove sensitive paths from robots.txt or use authentication.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t30" data-mode="quick">
+  <summary>#30 — IDE/OS File Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== IDE/OS FILE EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for .DS_Store, Thumbs.db, .idea/, .vscode/ files accessible via HTTP.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; for IDE/OS files</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No IDE/OS files exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">EXPOSED</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Block dotfiles and IDE configs in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t31" data-mode="quick">
+  <summary>#31 — Exposed Admin Panels <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== EXPOSED ADMIN PANELS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes for common admin panels (wp-admin, phpmyadmin, adminer, cPanel, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -o /dev/null -w &quot;%{http_code}&quot; for admin paths</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No common admin panels exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Admin panels accessible</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Block or auth-protect admin panel paths.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t32" data-mode="quick">
+  <summary>#32 — Account Enumeration <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== ACCOUNT ENUMERATION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Compares login responses for valid vs invalid usernames to detect enumeration.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>POST login with valid vs fake email, compare responses</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Login responses identical (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Different responses — enumeration possible</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Return identical responses for all login failures.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t33" data-mode="quick">
+  <summary>#33 — CSP Detailed Audit <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CSP DETAILED AUDIT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Analyzes CSP header for unsafe-inline, unsafe-eval, wildcards, and data: sources.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep content-security-policy | check directives</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">CSP is strict (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: CSP weaknesses found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Remove unsafe-inline/eval; use nonces or hashes.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t34" data-mode="quick">
+  <summary>#34 — Permissions Policy <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PERMISSIONS POLICY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for Permissions-Policy header to restrict browser features.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep permissions-policy</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No Permissions-Policy header</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add Permissions-Policy header restricting camera, mic, etc.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t35" data-mode="quick">
+  <summary>#35 — Cross-Origin Isolation <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CROSS-ORIGIN ISOLATION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for COOP, COEP, CORP headers needed for cross-origin isolation.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep cross-origin headers</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Headers present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing COOP/COEP/CORP headers</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add Cross-Origin-Opener/Embedder/Resource-Policy headers.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t36" data-mode="quick">
+  <summary>#36 — Weak TLS Ciphers <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== WEAK TLS CIPHERS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts connections with weak ciphers (RC4, DES, NULL, EXPORT, MD5).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>openssl s_client -cipher WEAK for each</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No weak ciphers accepted (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Weak cipher accepted</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Configure strong cipher suites in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t37" data-mode="quick">
+  <summary>#37 — TLS Version Check <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== TLS VERSION CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Tests if deprecated TLS 1.0 and 1.1 are still accepted.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>openssl s_client -tls1 / -tls1_1</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">TLS 1.0 and 1.1 rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: TLS1/TLS1.1 still accepted</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set ssl_protocols TLSv1.2 TLSv1.3 in nginx.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t38" data-mode="quick">
+  <summary>#38 — Certificate Chain <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CERTIFICATE CHAIN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Counts certificates in chain to verify intermediate cert is included.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>openssl s_client -showcerts | grep -c BEGIN CERTIFICATE</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Intermediate present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Intermediate may be missing</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Include intermediate CA cert in ssl_certificate.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t39" data-mode="quick">
+  <summary>#39 — DNS CAA Records <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DNS CAA RECORDS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for CAA DNS records that restrict which CAs can issue certificates.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>dig CAA domain +short</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">CAA records found (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No CAA records</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add CAA DNS records limiting certificate issuers.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t40" data-mode="quick">
+  <summary>#40 — SPF / DMARC Check <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(34,197,94,.15);color:#4ade80;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">QUICK</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SPF / DMARC CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Verifies SPF and DMARC DNS records for email authentication.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>dig TXT domain | grep v=spf; dig TXT _dmarc.domain</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">SPF and DMARC present</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No SPF/DMARC record found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add SPF and DMARC TXT records to DNS.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t41" data-mode="deep">
+  <summary>#41 — Nmap Port Scan <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NMAP PORT SCAN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Scans top 100 TCP ports on the resolved domain IP using nmap.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>nmap -sT -T4 --top-ports 100 IP</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Port scan results (informational)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Open unexpected ports</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Close unnecessary ports via firewall.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t42" data-mode="deep">
+  <summary>#42 — Nmap Service Detection <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NMAP SERVICE DETECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Detects service versions running on the configured port.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>nmap -sV -T4 -p PORT localhost</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>port</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Service detection results</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Outdated service versions</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Update services to latest stable versions.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t43" data-mode="deep">
+  <summary>#43 — Nmap Vuln Scripts <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NMAP VULN SCAN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Runs nmap vulnerability detection scripts against the service port.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>nmap --script vuln -T4 -p PORT localhost</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>port</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No known vulns</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">VULNERABLE</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Patch identified vulnerabilities.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t44" data-mode="deep">
+  <summary>#44 — Nikto Web Scan <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NIKTO WEB SCAN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Comprehensive web server scan using Nikto, capped at 120s.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>nikto -h ${baseUrl} -Tuning 1234567890 -maxtime 120s</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Scan complete</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">OSVDB findings</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Address each Nikto finding individually.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t45" data-mode="deep">
+  <summary>#45 — SSH Security <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SSH SECURITY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks sshd_config for PasswordAuthentication, PermitRootLogin settings.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>grep sshd_config for risky settings</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">SSH configuration looks secure (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Password auth / root login</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set PasswordAuthentication no and PermitRootLogin no.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t46" data-mode="deep">
+  <summary>#46 — Firewall Rules <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== FIREWALL RULES ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Lists current firewall rules (iptables or firewalld).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>sudo iptables -L -n || firewall-cmd --list-all</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Firewall rules listed</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">No firewall tool found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Configure firewalld or iptables.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t47" data-mode="deep">
+  <summary>#47 — OS Package Audit <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== OS PACKAGE AUDIT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for available security updates using dnf/apt.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>dnf check-update --security | head -30</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">All packages up to date (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Security updates available</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Run dnf update.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t48" data-mode="deep">
+  <summary>#48 — Kernel Version <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== KERNEL VERSION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Reports kernel version and OS release for tracking.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>uname -r &amp;&amp; cat /etc/os-release</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Informational</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">N/A</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Keep kernel updated.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t49" data-mode="deep">
+  <summary>#49 — Systemd Hardening <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SYSTEMD HARDENING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks systemd unit for PrivateTmp, NoNewPrivileges, ProtectSystem.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>systemctl cat SERVICE | check directives</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>systemd</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Security directives enabled (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing directives</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add security directives to systemd unit.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t50" data-mode="deep">
+  <summary>#50 — SSRF Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A10</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SSRF PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Tests if server follows internal URLs (169.254.169.254, localhost, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl with internal URL payloads in ?url=</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No SSRF indicators detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: possible SSRF</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate and whitelist allowed URLs.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t51" data-mode="deep">
+  <summary>#51 — GraphQL Introspection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== GRAPHQL INTROSPECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends __schema query to check if introspection is enabled.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST /graphql with introspection query</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Introspection enabled</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Disable introspection in production.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t52" data-mode="deep">
+  <summary>#52 — API Key in Source <span class="badge badge-app">Application</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== API KEY IN SOURCE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Scans page source for exposed API key patterns (Google, Stripe, AWS).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl page source | regex for key patterns</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No API keys found (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: API key pattern found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Move secrets to env variables.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t53" data-mode="deep">
+  <summary>#53 — WebSocket Auth <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== WEBSOCKET AUTH ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts WebSocket upgrade without auth token.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl with WebSocket upgrade headers to /ws</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Auth required (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Accepted without auth</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Require auth token in WS handshake.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t54" data-mode="deep">
+  <summary>#54 — File Upload Test <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== FILE UPLOAD TEST ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts to upload a .php file to test extension blocking.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -F &quot;file=test.php&quot; POST /api/upload</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Blocked (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Server accepted .php</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Whitelist allowed file extensions.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t55" data-mode="deep">
+  <summary>#55 — HTTP Request Smuggling <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HTTP REQUEST SMUGGLING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends conflicting CL and TE headers.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl with CL/TE mismatch payload</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Manual verification recommended</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Possible smuggling</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Reject ambiguous requests.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t56" data-mode="deep">
+  <summary>#56 — Verb Tampering <span class="badge badge-app">Application</span> <span class="owasp">OWASP A01</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== VERB TAMPERING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends GET to POST-only endpoint to test method enforcement.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl GET &quot;${baseUrl}/api/auth/login&quot;</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Methods enforced (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: GET returned 200</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Enforce HTTP method checks.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t57" data-mode="deep">
+  <summary>#57 — Content-Type Mismatch <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CONTENT-TYPE MISMATCH ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends XML body to JSON endpoint to test validation.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -H &quot;Content-Type: application/xml&quot; POST login</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Content type validated (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Server accepted XML</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate Content-Type in middleware.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t58" data-mode="deep">
+  <summary>#58 — Mass Assignment <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== MASS ASSIGNMENT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends registration with isAdmin:true to check field whitelisting.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST register with admin fields</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Extra fields not reflected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Admin fields reflected</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Use field allowlists in controllers.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t59" data-mode="deep">
+  <summary>#59 — Excessive Data Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== EXCESSIVE DATA EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if API responses contain sensitive field names.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST login | check for password/hash/ssn</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No sensitive fields exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Sensitive fields found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Strip sensitive fields from responses.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t60" data-mode="deep">
+  <summary>#60 — JWT None Algorithm <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== JWT NONE ALGORITHM ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends JWT with alg:none to test for auth bypass.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl /api/auth/me with alg:none JWT</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Auth bypass!</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Verify JWT algorithm matches expected.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t61" data-mode="deep">
+  <summary>#61 — JWT Expired Token <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== JWT EXPIRED TOKEN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends expired JWT (exp:2020) to check expiration validation.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl /api/auth/me with expired JWT</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Expired JWT accepted</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Always verify exp claim.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t62" data-mode="deep">
+  <summary>#62 — Session/Cookie Timeout <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SESSION TIMEOUT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks cookie max-age/expires settings.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep set-cookie | check expiry</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Expiry set (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No max-age / extremely long</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set reasonable cookie expiry.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t63" data-mode="deep">
+  <summary>#63 — Password Policy <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PASSWORD POLICY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Attempts registration with weak passwords (123, aaa, a).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST register with weak passwords</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Weak passwords rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Weak password accepted</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Enforce minimum length + complexity.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t64" data-mode="deep">
+  <summary>#64 — Default Credentials <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DEFAULT CREDENTIALS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Tries common default credential pairs.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST login with admin/admin, root/root</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not accepted (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Default credentials work</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Remove default accounts.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t65" data-mode="deep">
+  <summary>#65 — OTP Flood Check <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== OTP FLOOD CHECK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends 10 rapid OTP requests to check rate limiting.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST /api/auth/send-otp x10</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Rate limiting active (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No rate limiting</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Rate limit OTP endpoints.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t66" data-mode="deep">
+  <summary>#66 — Error Handling Leak <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== ERROR HANDLING LEAK ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Requests non-existent API route, checks for stack traces.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl &quot;${baseUrl}/api/nonexistent&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Clean error responses (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Stack trace leaked</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Use generic error messages.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t67" data-mode="deep">
+  <summary>#67 — Monitoring Endpoints <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== MONITORING ENDPOINTS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes /health, /metrics, /env, /actuator for public access.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; for monitoring paths</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">EXPOSED</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Restrict to internal networks.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t68" data-mode="deep">
+  <summary>#68 — Open Ports (Full) <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== OPEN PORTS (FULL) ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Lists all listening TCP ports on the server.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>ss -tlnp | head -30</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Informational</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">N/A</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Close unnecessary ports.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t69" data-mode="deep">
+  <summary>#69 — Subresource Integrity <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SUBRESOURCE INTEGRITY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if CDN scripts have integrity attributes.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl source | find CDN scripts | check integrity</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">All CDN scripts have integrity (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing integrity</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add integrity=&quot;sha384-...&quot; to CDN tags.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t70" data-mode="deep">
+  <summary>#70 — HSTS Preload <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HSTS PRELOAD ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks HSTS for preload and includeSubDomains directives.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep strict-transport-security</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Preload directives present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing preload/includeSubDomains</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add preload; submit to hstspreload.org.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t71" data-mode="deep">
+  <summary>#71 — Certificate Transparency <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CERTIFICATE TRANSPARENCY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for Signed Certificate Timestamps (SCT).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>openssl s_client -ct | grep SCT</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">SCT found</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">No SCT information</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Use CT-supporting CA; verify at crt.sh.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t72" data-mode="deep">
+  <summary>#72 — Reverse DNS (PTR) <span class="badge badge-network">Network/TLS</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== REVERSE DNS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Resolves IP to hostname via PTR record.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>dig -x IP +short</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">PTR record found</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">No PTR record</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set up PTR record with hosting provider.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t73" data-mode="deep">
+  <summary>#73 — IPv6 Exposure <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== IPV6 EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Lists IPv6 TCP listeners that may bypass IPv4 firewalls.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>ss -6 -tlnp | head -15</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">IPv6 info (informational)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Unexpected listeners</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Apply firewall rules to IPv6 too.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t74" data-mode="deep">
+  <summary>#74 — Sensitive Data in URL <span class="badge badge-app">Application</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SENSITIVE DATA IN URL ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends credentials as GET params to check processing.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl GET /api/auth/login?email=...&amp;password=...</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not processed via GET (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Accepts creds via GET</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Only accept credentials in POST body.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t75" data-mode="deep">
+  <summary>#75 — Log Injection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A09</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== LOG INJECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends newline-injected payload to test log integrity.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl with newline payload in query param</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Informational — check logs</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Possible log injection</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Sanitize newlines in log output.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t76" data-mode="deep">
+  <summary>#76 — SSTI Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SSTI PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends template expressions ({{7*7}}) checking evaluation.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl with template payloads | check for &quot;49&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No template injection (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Template evaluated</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Never render user input in templates.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t77" data-mode="deep">
+  <summary>#77 — XXE Probe <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== XXE PROBE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends XML with external entity referencing /etc/hostname.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST with XXE payload as application/xml</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No XXE vulnerability (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Entity resolved</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Disable external entity processing.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t78" data-mode="deep">
+  <summary>#78 — Dependency Confusion <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== DEPENDENCY CONFUSION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for scoped (@org/) packages that might not exist on npm.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>cat package.json | find scoped packages</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Low risk (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Scoped packages found — verify</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Pin packages; use .npmrc for private registry.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t79" data-mode="deep">
+  <summary>#79 — Cookie Scope <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== COOKIE SCOPE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if cookies have overly broad domain/path.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep set-cookie | check scope</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Scope limited (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Overly broad scope</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set explicit Path and Domain.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t80" data-mode="deep">
+  <summary>#80 — Referrer Policy <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== REFERRER POLICY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for Referrer-Policy header.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep referrer-policy</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing / unsafe-url</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Set strict-origin-when-cross-origin.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t81" data-mode="deep">
+  <summary>#81 — X-Download-Options <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== X-DOWNLOAD-OPTIONS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for X-Download-Options: noopen.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep x-download-options</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Missing</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add X-Download-Options: noopen.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t82" data-mode="deep">
+  <summary>#82 — Cache Control <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CACHE CONTROL ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for no-store in Cache-Control.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep cache-control</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">no-store present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: no-store missing</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add Cache-Control: no-store.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t83" data-mode="deep">
+  <summary>#83 — Expect-CT Header <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A02</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== EXPECT-CT HEADER ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for Expect-CT header (being deprecated).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep expect-ct</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>domain</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Informational — deprecated</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Transitioning to CT via TLS extension.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t84" data-mode="deep">
+  <summary>#84 — NEL / Report-To <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A09</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== NEL / REPORT-TO ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for Network Error Logging and Report-To headers.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI | grep nel or report-to</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Configured (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Informational — consider adding</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add NEL/Report-To for monitoring.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t85" data-mode="deep">
+  <summary>#85 — Service Worker <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SERVICE WORKER ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if sw.js or service-worker.js is accessible.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; /sw.js /service-worker.js</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not detected</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Found — verify scope</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Audit SW scope and caching.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t86" data-mode="deep">
+  <summary>#86 — API Versioning <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== API VERSIONING ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes /api/v0-v3 to find deprecated versions.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; for each version</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No old versions found</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">Old versions responding</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Deprecate old API versions.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t87" data-mode="deep">
+  <summary>#87 — CORS Wildcard + Credentials <span class="badge badge-header">Security Header</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== CORS WILDCARD + CREDENTIALS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for dangerous Access-Control-Allow-Origin: * with Allow-Credentials: true.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -sI -H &quot;Origin: evil.com&quot; | check CORS</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">No dangerous combo (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">CRITICAL: Wildcard + credentials</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Never combine wildcard origin with credentials.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t88" data-mode="deep">
+  <summary>#88 — Swagger/OpenAPI Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SWAGGER/OPENAPI EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for public API docs (/swagger.json, /api-docs, etc.).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; for swagger paths</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Publicly accessible</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Require auth for API docs.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t89" data-mode="deep">
+  <summary>#89 — Prototype Pollution <span class="badge badge-app">Application</span> <span class="owasp">OWASP A03</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PROTOTYPE POLLUTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends __proto__/constructor payloads to check reflection.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST with __proto__ payloads</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Payload reflected</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Sanitize input; use Object.create(null).</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t90" data-mode="deep">
+  <summary>#90 — Host Header Injection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HOST HEADER INJECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends Host: evil.com to check if reflected (password reset poisoning).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -H &quot;Host: evil.com&quot; &quot;${baseUrl}/&quot;</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not reflected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Host header reflected</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate Host header.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t91" data-mode="deep">
+  <summary>#91 — Registration Rate Limit <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== REGISTRATION RATE LIMIT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends 10 rapid registrations checking for 429.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST register x10</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Rate limiting active (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No rate limiting</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Add rate limiting to registration.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t92" data-mode="deep">
+  <summary>#92 — Brute Force Detection <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== BRUTE FORCE DETECTION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Sends 15 failed logins checking for lockout (429/423).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST login x15 with wrong passwords</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Lockout detected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: No lockout after 15 attempts</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Implement progressive delays or lockout.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t93" data-mode="deep">
+  <summary>#93 — Password Reset Token <span class="badge badge-app">Application</span> <span class="owasp">OWASP A07</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PASSWORD RESET TOKEN ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if reset response contains token (should only be in email).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl POST /api/auth/forgot-password</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Token in response</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Only send reset links via email.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t94" data-mode="deep">
+  <summary>#94 — Security.txt (RFC 9116) <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== SECURITY.TXT ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks for /.well-known/security.txt per RFC 9116.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; /.well-known/security.txt</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Present (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Not found</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Create security.txt with contact info.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t95" data-mode="deep">
+  <summary>#95 — Lockfile Integrity <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A06</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== LOCKFILE INTEGRITY ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks package-lock.json exists and npm ls reports no mismatches.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>npm ls --all | check for WARN/ERR</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Integrity OK (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Mismatches</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Run npm ci and commit lockfile.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t96" data-mode="deep">
+  <summary>#96 — MIME Type Confusion <span class="badge badge-app">Application</span> <span class="owasp">OWASP A04</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== MIME TYPE CONFUSION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Uploads HTML disguised as JPG to test MIME validation.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -F &quot;file=test.html.jpg;type=image/jpeg&quot;</pre></div>
+    <div class="field"><div class="field-label">Condition</div><div class="field-value">Only runs when <code>backend</code> is configured</div></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Rejected (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Accepted</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Validate file content, not just extension.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t97" data-mode="deep">
+  <summary>#97 — Public Storage Buckets <span class="badge badge-recon">Reconnaissance</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== PUBLIC STORAGE BUCKETS ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Scans source for S3, GCS, Azure Blob URLs.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl source | regex for cloud storage URLs</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">None found (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">URLs found — verify access</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Review bucket policies.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t98" data-mode="deep">
+  <summary>#98 — TRACE Method (XST) <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== TRACE METHOD (XST) ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks if TRACE method is enabled (Cross-Site Tracing).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -X TRACE | check echo</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Disabled (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Enabled</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Disable TRACE method.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t99" data-mode="deep">
+  <summary>#99 — API Playground Exposure <span class="badge badge-app">Application</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== API PLAYGROUND EXPOSURE ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Probes /graphql, /graphiql, /playground, /altair for public access.</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl -w &quot;%{http_code}&quot; for playgrounds</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">Not exposed (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: Publicly accessible</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Require auth or disable.</div></div>
+  </div>
+</details>
+
+<details class="test-card" id="t100" data-mode="deep">
+  <summary>#100 — HTTP/2 &amp; Compression <span class="badge badge-infra">Infrastructure</span> <span class="owasp">OWASP A05</span> <span style="font-size:.55rem;background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;border-radius:999px;font-weight:600;margin-left:.3rem">DEEP</span></summary>
+  <div class="test-body">
+    <div class="field"><div class="field-label">Section Header</div><div class="field-value"><code>=== HTTP/2 &amp; COMPRESSION ===</code></div></div>
+    <div class="field"><div class="field-label">Purpose</div><div class="field-value">Checks HTTP/2 support and response compression (gzip/br).</div></div>
+    <div class="field"><div class="field-label">Command Pattern</div><pre>curl --http2 -sI; curl -H Accept-Encoding</pre></div>
+    <hr class="section-divider">
+    <div class="field"><div class="field-label">Pass Indicator</div><div class="field-value"><span class="pass-kw">HTTP/2 + compression (good)</span></div></div>
+    <div class="field"><div class="field-label">Fail Indicator</div><div class="field-value"><span class="fail-kw">WARN: HTTP/1.1 only / no compression</span></div></div>
+    <div class="field"><div class="field-label">Remediation</div><div class="field-value">Enable HTTP/2 and gzip/brotli in nginx.</div></div>
+  </div>
+</details>
+
+
+<h2 id="owasp">OWASP Top 10 Coverage</h2>
+<table>
+  <tr><th>OWASP Category</th><th>Test Cases</th><th>Count</th></tr>
+  <tr><td>A01 — Broken Access Control</td><td style="font-size:.7rem">#6 Sensitive File Exposure, #11 Git Exposure, #15 Open Redirect, #23 Path Traversal, #26 Forced Browsing, #27 Backup File Exposure, #30 IDE/OS File Exposure, #31 Exposed Admin Panels, #56 Verb Tampering</td><td>9</td></tr>
+  <tr><td>A02 — Cryptographic Failures</td><td style="font-size:.7rem">#4 SSL/TLS Certificate Check, #12 Cookie Security, #17 HSTS Check, #19 Mixed Content, #36 Weak TLS Ciphers, #37 TLS Version Check, #38 Certificate Chain, #52 API Key in Source, #70 HSTS Preload, #71 Certificate Transparency, #74 Sensitive Data in URL, #79 Cookie Scope, #83 Expect-CT Header</td><td>13</td></tr>
+  <tr><td>A03 — Injection</td><td style="font-size:.7rem">#10 XSS Reflection, #21 SQL Injection Probe, #22 NoSQL Injection Probe, #24 Command Injection Probe, #25 CRLF / Header Injection, #59 Excessive Data Exposure, #76 SSTI Probe, #89 Prototype Pollution</td><td>8</td></tr>
+  <tr><td>A04 — Insecure Design</td><td style="font-size:.7rem">#8 Rate Limiting, #54 File Upload Test, #58 Mass Assignment, #65 OTP Flood Check, #91 Registration Rate Limit, #96 MIME Type Confusion</td><td>6</td></tr>
+  <tr><td>A05 — Security Misconfiguration</td><td style="font-size:.7rem">#3 Security Headers Scan, #5 Port Check, #7 CORS Misconfiguration, #9 Directory Listing, #13 Server Info Leakage, #14 HTTP Methods Check, #16 Clickjacking Protection, #18 Content-Type Sniffing, #20 DNS Zone Transfer, #28 Debug Mode / Stack Trace, #29 Robots.txt Secrets, #33 CSP Detailed Audit, #34 Permissions Policy, #35 Cross-Origin Isolation, #39 DNS CAA Records, #40 SPF / DMARC Check, #41 Nmap Port Scan, #42 Nmap Service Detection, #44 Nikto Web Scan, #45 SSH Security, #46 Firewall Rules, #49 Systemd Hardening, #51 GraphQL Introspection, #55 HTTP Request Smuggling, #57 Content-Type Mismatch, #66 Error Handling Leak, #67 Monitoring Endpoints, #68 Open Ports (Full), #69 Subresource Integrity, #72 Reverse DNS (PTR), #73 IPv6 Exposure, #77 XXE Probe, #80 Referrer Policy, #81 X-Download-Options, #82 Cache Control, #85 Service Worker, #86 API Versioning, #87 CORS Wildcard + Credentials, #88 Swagger/OpenAPI Exposure, #90 Host Header Injection, #94 Security.txt (RFC 9116), #97 Public Storage Buckets, #98 TRACE Method (XST), #99 API Playground Exposure, #100 HTTP/2 & Compression</td><td>45</td></tr>
+  <tr><td>A06 — Vulnerable Components</td><td style="font-size:.7rem">#1 NPM Audit, #2 Outdated Packages, #43 Nmap Vuln Scripts, #47 OS Package Audit, #48 Kernel Version, #78 Dependency Confusion, #95 Lockfile Integrity</td><td>7</td></tr>
+  <tr><td>A07 — Identification & Auth Failures</td><td style="font-size:.7rem">#32 Account Enumeration, #53 WebSocket Auth, #60 JWT None Algorithm, #61 JWT Expired Token, #62 Session/Cookie Timeout, #63 Password Policy, #64 Default Credentials, #92 Brute Force Detection, #93 Password Reset Token</td><td>9</td></tr>
+  <tr><td>A09 — Security Logging & Monitoring</td><td style="font-size:.7rem">#75 Log Injection, #84 NEL / Report-To</td><td>2</td></tr>
+  <tr><td>A10 — Server-Side Request Forgery</td><td style="font-size:.7rem">#50 SSRF Probe</td><td>1</td></tr>
+</table>
+
+<div class="footer">
+  KrishHub Security Test Suite Documentation · 100 Test Cases · Quick Scan (1–40) + Deep Scan (41–100)<br>
+  Tools: curl · openssl · dig · ss · npm · nmap · nikto<br>
+  Source: <code>backend/server.js</code> · <code>frontend/src/views/console/DeployDashboard.jsx</code>
+</div>
+
+</div>
+</body>
+</html>
